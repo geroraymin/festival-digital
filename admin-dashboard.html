@@ -47,6 +47,10 @@
                         data-tab="stats">
                     통계
                 </button>
+                <button class="tab-btn py-2 px-1 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700" 
+                        data-tab="export">
+                    데이터 내보내기
+                </button>
             </nav>
         </div>
 
@@ -186,6 +190,89 @@
                 </div>
             </div>
         </div>
+
+        <!-- 데이터 내보내기 탭 -->
+        <div id="export-tab" class="tab-content hidden">
+            <div class="bg-white rounded-lg shadow p-6">
+                <h2 class="text-lg font-bold mb-4">데이터 내보내기</h2>
+                <p class="text-gray-600 mb-6">필요한 데이터를 CSV 형식으로 다운로드할 수 있습니다.</p>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- 참가자 데이터 -->
+                    <div class="border rounded-lg p-4">
+                        <h3 class="font-bold mb-2">참가자 명단</h3>
+                        <p class="text-sm text-gray-600 mb-4">전체 참가자 정보를 다운로드합니다.</p>
+                        <button onclick="exportData('participants')" 
+                                class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+                            <svg class="inline w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                      d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path>
+                            </svg>
+                            참가자 데이터 다운로드
+                        </button>
+                    </div>
+                    
+                    <!-- 부스별 통계 -->
+                    <div class="border rounded-lg p-4">
+                        <h3 class="font-bold mb-2">부스별 통계</h3>
+                        <p class="text-sm text-gray-600 mb-4">각 부스의 참가자 통계를 다운로드합니다.</p>
+                        <button onclick="exportData('booth-stats')" 
+                                class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
+                            <svg class="inline w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                      d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                            </svg>
+                            부스 통계 다운로드
+                        </button>
+                    </div>
+                    
+                    <!-- 운영자 실적 -->
+                    <div class="border rounded-lg p-4">
+                        <h3 class="font-bold mb-2">운영자 실적</h3>
+                        <p class="text-sm text-gray-600 mb-4">운영자별 운영 시간과 실적을 다운로드합니다.</p>
+                        <button onclick="exportData('operator-performance')" 
+                                class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700">
+                            <svg class="inline w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                      d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                            </svg>
+                            운영자 실적 다운로드
+                        </button>
+                    </div>
+                    
+                    <!-- 종합 보고서 -->
+                    <div class="border rounded-lg p-4">
+                        <h3 class="font-bold mb-2">종합 보고서</h3>
+                        <p class="text-sm text-gray-600 mb-4">모든 데이터를 한 번에 다운로드합니다.</p>
+                        <button onclick="exportData('comprehensive')" 
+                                class="bg-orange-600 text-white px-4 py-2 rounded hover:bg-orange-700">
+                            <svg class="inline w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                            종합 보고서 다운로드
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- 기간 설정 -->
+                <div class="mt-6 p-4 bg-gray-50 rounded-lg">
+                    <h3 class="font-bold mb-3">기간 설정 (선택사항)</h3>
+                    <div class="flex space-x-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">시작일</label>
+                            <input type="date" id="exportStartDate" 
+                                   class="px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">종료일</label>
+                            <input type="date" id="exportEndDate" 
+                                   class="px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- 부스 추가 모달 -->
@@ -221,6 +308,7 @@
     <script type="module">
         import { supabase } from './src/js/supabase-client.js';
         import { getAllBoothCodes, assignCodeToBooth, regenerateBoothCode } from './src/js/booth-code.js';
+        import { exportParticipants, exportBoothStatistics, exportOperatorPerformance, exportComprehensiveReport } from './src/js/data-export.js';
 
         // 관리자 세션 확인
         const adminSession = JSON.parse(localStorage.getItem('admin_session') || '{}');
@@ -281,6 +369,9 @@
                     break;
                 case 'stats':
                     await loadStats();
+                    break;
+                case 'export':
+                    // 내보내기 탭은 별도 로드 필요 없음
                     break;
             }
         }
@@ -629,6 +720,38 @@
                 alert('부스 추가에 실패했습니다.');
             }
         });
+
+        // 데이터 내보내기 함수
+        window.exportData = async function(type) {
+            const startDate = document.getElementById('exportStartDate')?.value || null;
+            const endDate = document.getElementById('exportEndDate')?.value || null;
+            
+            let result;
+            
+            switch(type) {
+                case 'participants':
+                    result = await exportParticipants({ startDate, endDate });
+                    break;
+                case 'booth-stats':
+                    result = await exportBoothStatistics({ startDate, endDate });
+                    break;
+                case 'operator-performance':
+                    result = await exportOperatorPerformance({ startDate, endDate });
+                    break;
+                case 'comprehensive':
+                    result = await exportComprehensiveReport({ startDate, endDate });
+                    break;
+                default:
+                    alert('잘못된 내보내기 유형입니다.');
+                    return;
+            }
+            
+            if (result.success) {
+                alert(result.message);
+            } else {
+                alert('내보내기 실패: ' + result.error);
+            }
+        };
 
         // 초기 로드
         loadOverview();
