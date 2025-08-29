@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>디지털 방명록 작성 - 청소년 축제</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        .booth-card {
+            transition: all 0.3s ease;
+        }
+        .booth-card:hover {
+            transform: translateY(-4px);
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-purple-50 to-blue-50 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <!-- 헤더 -->
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-800 mb-2">청소년 축제 방명록</h1>
+            <p class="text-lg text-gray-600">부스를 선택하고 방명록을 작성해주세요</p>
+        </header>
+
+        <!-- 부스 선택 화면 -->
+        <div id="boothSelection" class="max-w-4xl mx-auto">
+            <h2 class="text-2xl font-bold text-center mb-6">부스를 선택하세요</h2>
+            <div id="boothList" class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- 부스 목록이 여기에 동적으로 로드됩니다 -->
+                <div class="text-center py-8 text-gray-500 col-span-full">
+                    부스 목록을 불러오는 중...
+                </div>
+            </div>
+        </div>
+
+        <!-- 방명록 작성 폼 -->
+        <div id="guestbookForm" class="hidden max-w-md mx-auto">
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <button id="backToBoothList" class="text-blue-600 hover:text-blue-800 mb-4">
+                    ← 부스 목록으로
+                </button>
+                
+                <h2 class="text-2xl font-bold mb-2" id="selectedBoothName">-</h2>
+                <p class="text-gray-600 mb-6">방명록을 작성해주세요</p>
+                
+                <form id="participantForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">이름 *</label>
+                        <input type="text" name="name" required 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-purple-500 focus:border-purple-500">
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">성별 *</label>
+                            <select name="gender" required 
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-purple-500 focus:border-purple-500">
+                                <option value="">선택</option>
+                                <option value="남">남성</option>
+                                <option value="여">여성</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">학년 *</label>
+                            <select name="grade" required 
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-purple-500 focus:border-purple-500">
+                                <option value="">선택</option>
+                                <option value="초등학생">초등학생</option>
+                                <option value="중학생">중학생</option>
+                                <option value="고등학생">고등학생</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">연락처 (선택)</label>
+                        <input type="tel" name="phone" 
+                               placeholder="010-0000-0000"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-purple-500 focus:border-purple-500">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">메시지</label>
+                        <textarea name="message" rows="3" 
+                                  placeholder="부스에 대한 감상이나 메시지를 남겨주세요"
+                                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-purple-500 focus:border-purple-500"></textarea>
+                    </div>
+                    
+                    <button type="submit" 
+                            class="w-full bg-purple-600 text-white py-3 px-4 rounded-md hover:bg-purple-700 transition font-medium">
+                        방명록 작성 완료
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- 완료 메시지 -->
+        <div id="completionMessage" class="hidden max-w-md mx-auto">
+            <div class="bg-white rounded-xl shadow-lg p-8 text-center">
+                <div class="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg class="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                </div>
+                <h2 class="text-2xl font-bold mb-2">감사합니다!</h2>
+                <p class="text-gray-600 mb-6">방명록이 성공적으로 등록되었습니다.</p>
+                <button id="writeAnother" 
+                        class="bg-purple-600 text-white py-2 px-6 rounded-md hover:bg-purple-700 transition">
+                    다른 부스 방명록 작성
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript -->
+    <script type="module">
+        import { supabase } from './src/js/supabase-client.js';
+        
+        let selectedBoothId = null;
+        let selectedBoothName = null;
+
+        // 부스 목록 로드
+        async function loadBooths() {
+            try {
+                const { data, error } = await supabase
+                    .from('booths')
+                    .select('*')
+                    .eq('is_active', true)
+                    .order('name');
+                
+                if (error) throw error;
+                
+                const boothListDiv = document.getElementById('boothList');
+                
+                if (!data || data.length === 0) {
+                    boothListDiv.innerHTML = '<div class="text-center py-8 text-gray-500 col-span-full">현재 운영 중인 부스가 없습니다.</div>';
+                    return;
+                }
+                
+                boothListDiv.innerHTML = data.map(booth => `
+                    <div class="booth-card bg-white rounded-lg shadow hover:shadow-lg p-6 cursor-pointer"
+                         onclick="selectBooth(${booth.id}, '${booth.name}')">
+                        <div class="text-center">
+                            <div class="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                                <svg class="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                          d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                                </svg>
+                            </div>
+                            <h3 class="font-bold text-lg mb-1">${booth.name}</h3>
+                            <p class="text-sm text-gray-600">${booth.description || '클릭하여 방명록 작성'}</p>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('부스 목록 로드 실패:', error);
+                document.getElementById('boothList').innerHTML = 
+                    '<div class="text-center py-8 text-red-500 col-span-full">부스 목록을 불러오는데 실패했습니다.</div>';
+            }
+        }
+
+        // 부스 선택
+        window.selectBooth = function(boothId, boothName) {
+            selectedBoothId = boothId;
+            selectedBoothName = boothName;
+            
+            document.getElementById('selectedBoothName').textContent = boothName;
+            document.getElementById('boothSelection').classList.add('hidden');
+            document.getElementById('guestbookForm').classList.remove('hidden');
+        };
+
+        // 부스 목록으로 돌아가기
+        document.getElementById('backToBoothList').addEventListener('click', function() {
+            document.getElementById('guestbookForm').classList.add('hidden');
+            document.getElementById('boothSelection').classList.remove('hidden');
+            document.getElementById('participantForm').reset();
+        });
+
+        // 방명록 작성 완료
+        document.getElementById('participantForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            if (!selectedBoothId) {
+                alert('부스를 선택해주세요.');
+                return;
+            }
+            
+            const formData = new FormData(this);
+            const participantData = {
+                booth_id: selectedBoothId,
+                name: formData.get('name'),
+                gender: formData.get('gender'),
+                grade: formData.get('grade'),
+                phone: formData.get('phone') || null,
+                message: formData.get('message') || null,
+                created_at: new Date().toISOString()
+            };
+            
+            try {
+                const { data, error } = await supabase
+                    .from('participants')
+                    .insert(participantData)
+                    .select();
+                
+                if (error) throw error;
+                
+                // 완료 메시지 표시
+                document.getElementById('guestbookForm').classList.add('hidden');
+                document.getElementById('completionMessage').classList.remove('hidden');
+                
+                // 폼 초기화
+                this.reset();
+            } catch (error) {
+                console.error('방명록 작성 실패:', error);
+                alert('방명록 작성에 실패했습니다. 다시 시도해주세요.');
+            }
+        });
+
+        // 다른 부스 방명록 작성
+        document.getElementById('writeAnother').addEventListener('click', function() {
+            document.getElementById('completionMessage').classList.add('hidden');
+            document.getElementById('boothSelection').classList.remove('hidden');
+            selectedBoothId = null;
+            selectedBoothName = null;
+        });
+
+        // 페이지 로드 시 부스 목록 로드
+        loadBooths();
+    </script>
+</body>
+</html>

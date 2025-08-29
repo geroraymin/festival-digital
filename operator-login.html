@@ -148,9 +148,9 @@
                 });
                 
                 if (result.success) {
-                    // 성공 시 메인 페이지로 이동
+                    // 성공 시 운영자 대시보드로 이동
                     alert(result.message);
-                    window.location.href = 'index.html';
+                    window.location.href = 'operator-dashboard.html';
                 } else {
                     // 에러 표시
                     errorDiv.textContent = result.message;
@@ -181,7 +181,7 @@
                 
                 if (result.success) {
                     alert(result.message);
-                    window.location.href = 'index.html';
+                    window.location.href = 'operator-dashboard.html';
                 } else {
                     errorDiv.textContent = result.message;
                     errorDiv.classList.remove('hidden');

@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>부스 운영 대시보드 - 청소년 축제 디지털 방명록</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-gray-50">
+    <!-- 네비게이션 -->
+    <nav class="bg-blue-600 text-white p-4 shadow-lg">
+        <div class="container mx-auto flex justify-between items-center">
+            <div>
+                <h1 class="text-xl font-bold">부스 운영 대시보드</h1>
+                <p class="text-sm opacity-90" id="boothName">-</p>
+            </div>
+            <div class="flex items-center space-x-4">
+                <span id="operatorName" class="text-sm">운영자</span>
+                <button id="endOperationBtn" class="bg-red-500 hover:bg-red-600 px-4 py-2 rounded text-sm">
+                    운영 종료
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 권한 없음 메시지 -->
+    <div id="unauthorizedMessage" class="hidden container mx-auto px-4 py-8">
+        <div class="bg-red-50 border border-red-300 text-red-700 p-6 rounded-lg text-center">
+            <h2 class="text-xl font-bold mb-2">접근 권한이 없습니다</h2>
+            <p>부스 운영 권한이 필요합니다.</p>
+            <a href="operator-login.html" class="inline-block mt-4 text-blue-600 hover:text-blue-800 underline">
+                부스 운영자 로그인 →
+            </a>
+        </div>
+    </div>
+
+    <!-- 메인 컨텐츠 (권한 있을 때만 표시) -->
+    <div id="mainContent" class="hidden container mx-auto px-4 py-6">
+        <!-- 운영 통계 카드 -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div class="bg-white rounded-lg shadow p-4">
+                <div class="text-2xl font-bold text-blue-600" id="totalCount">0</div>
+                <div class="text-sm text-gray-600">오늘 참가자</div>
+            </div>
+            <div class="bg-white rounded-lg shadow p-4">
+                <div class="text-2xl font-bold text-green-600" id="operationTime">0분</div>
+                <div class="text-sm text-gray-600">운영 시간</div>
+            </div>
+            <div class="bg-white rounded-lg shadow p-4">
+                <div class="text-2xl font-bold text-purple-600" id="maleCount">0</div>
+                <div class="text-sm text-gray-600">남성</div>
+            </div>
+            <div class="bg-white rounded-lg shadow p-4">
+                <div class="text-2xl font-bold text-pink-600" id="femaleCount">0</div>
+                <div class="text-sm text-gray-600">여성</div>
+            </div>
+        </div>
+
+        <!-- 참가자 등록 폼 -->
+        <div class="bg-white rounded-lg shadow p-6 mb-6">
+            <h2 class="text-lg font-bold mb-4">참가자 등록</h2>
+            <form id="participantForm" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">이름</label>
+                    <input type="text" name="name" required 
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">성별</label>
+                    <select name="gender" required 
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">선택</option>
+                        <option value="남">남성</option>
+                        <option value="여">여성</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">학년</label>
+                    <select name="grade" required 
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">선택</option>
+                        <option value="초등학생">초등학생</option>
+                        <option value="중학생">중학생</option>
+                        <option value="고등학생">고등학생</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">연락처 (선택)</label>
+                    <input type="tel" name="phone" 
+                           placeholder="010-0000-0000"
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">메시지</label>
+                    <textarea name="message" rows="2" 
+                              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"></textarea>
+                </div>
+                <div class="md:col-span-2">
+                    <button type="submit" 
+                            class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition">
+                        참가자 등록
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- 최근 참가자 목록 -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <h2 class="text-lg font-bold mb-4">최근 참가자</h2>
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead>
+                        <tr class="border-b">
+                            <th class="text-left py-2">시간</th>
+                            <th class="text-left py-2">이름</th>
+                            <th class="text-left py-2">성별</th>
+                            <th class="text-left py-2">학년</th>
+                            <th class="text-left py-2">메시지</th>
+                        </tr>
+                    </thead>
+                    <tbody id="participantList">
+                        <tr>
+                            <td colspan="5" class="text-center py-4 text-gray-500">
+                                아직 등록된 참가자가 없습니다.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript -->
+    <script type="module">
+        import { supabase } from './src/js/supabase-client.js';
+        import { getOperatorSession, operatorLogout, getCurrentBoothInfo, getOperationStats } from './src/js/operator-auth.js';
+        import { getCurrentUser, hasPermission, PERMISSIONS, updateUIByPermissions } from './src/js/auth-manager.js';
+
+        // 권한 체크
+        function checkAccess() {
+            const user = getCurrentUser();
+            const session = getOperatorSession();
+            
+            if (!session || user.role !== 'operator') {
+                // 권한 없음
+                document.getElementById('unauthorizedMessage').classList.remove('hidden');
+                document.getElementById('mainContent').classList.add('hidden');
+                return false;
+            }
+            
+            // 권한 있음
+            document.getElementById('unauthorizedMessage').classList.add('hidden');
+            document.getElementById('mainContent').classList.remove('hidden');
+            
+            // 운영자 정보 표시
+            const boothInfo = getCurrentBoothInfo();
+            document.getElementById('boothName').textContent = boothInfo.boothName;
+            document.getElementById('operatorName').textContent = boothInfo.operatorName;
+            
+            return true;
+        }
+
+        // 페이지 로드 시 권한 체크
+        if (!checkAccess()) {
+            // 권한이 없으면 더 이상 진행하지 않음
+        } else {
+            // 운영 통계 업데이트
+            updateStats();
+            
+            // 최근 참가자 로드
+            loadRecentParticipants();
+            
+            // 주기적으로 통계 업데이트 (30초마다)
+            setInterval(updateStats, 30000);
+        }
+
+        // 운영 통계 업데이트
+        async function updateStats() {
+            const stats = await getOperationStats();
+            if (stats) {
+                document.getElementById('totalCount').textContent = stats.total;
+                document.getElementById('operationTime').textContent = `${stats.operationTime}분`;
+                document.getElementById('maleCount').textContent = stats.male;
+                document.getElementById('femaleCount').textContent = stats.female;
+            }
+        }
+
+        // 최근 참가자 로드
+        async function loadRecentParticipants() {
+            const boothInfo = getCurrentBoothInfo();
+            if (!boothInfo) return;
+            
+            try {
+                const { data, error } = await supabase
+                    .from('participants')
+                    .select('*')
+                    .eq('booth_id', boothInfo.boothId)
+                    .gte('created_at', boothInfo.startedAt)
+                    .order('created_at', { ascending: false })
+                    .limit(10);
+                
+                if (error) throw error;
+                
+                const tbody = document.getElementById('participantList');
+                
+                if (!data || data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-gray-500">아직 등록된 참가자가 없습니다.</td></tr>';
+                    return;
+                }
+                
+                tbody.innerHTML = data.map(p => {
+                    const time = new Date(p.created_at).toLocaleTimeString('ko-KR', { 
+                        hour: '2-digit', 
+                        minute: '2-digit' 
+                    });
+                    
+                    return `
+                        <tr class="border-b">
+                            <td class="py-2 text-sm">${time}</td>
+                            <td class="py-2">${p.name}</td>
+                            <td class="py-2">${p.gender}</td>
+                            <td class="py-2">${p.grade}</td>
+                            <td class="py-2 text-sm text-gray-600">${p.message || '-'}</td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (error) {
+                console.error('참가자 목록 로드 실패:', error);
+            }
+        }
+
+        // 참가자 등록 폼 제출
+        document.getElementById('participantForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            // 권한 체크
+            if (!hasPermission(PERMISSIONS.ADD_PARTICIPANT)) {
+                alert('참가자 등록 권한이 없습니다.');
+                return;
+            }
+            
+            const boothInfo = getCurrentBoothInfo();
+            if (!boothInfo) {
+                alert('부스 정보를 찾을 수 없습니다.');
+                return;
+            }
+            
+            const formData = new FormData(this);
+            const participantData = {
+                booth_id: boothInfo.boothId,
+                name: formData.get('name'),
+                gender: formData.get('gender'),
+                grade: formData.get('grade'),
+                phone: formData.get('phone') || null,
+                message: formData.get('message') || null,
+                created_at: new Date().toISOString()
+            };
+            
+            try {
+                const { data, error } = await supabase
+                    .from('participants')
+                    .insert(participantData)
+                    .select();
+                
+                if (error) throw error;
+                
+                // 폼 초기화
+                this.reset();
+                
+                // 통계 및 목록 업데이트
+                updateStats();
+                loadRecentParticipants();
+                
+                // 성공 메시지
+                alert('참가자가 등록되었습니다.');
+            } catch (error) {
+                console.error('참가자 등록 실패:', error);
+                alert('참가자 등록에 실패했습니다.');
+            }
+        });
+
+        // 운영 종료
+        document.getElementById('endOperationBtn').addEventListener('click', async function() {
+            if (!confirm('정말 부스 운영을 종료하시겠습니까?')) {
+                return;
+            }
+            
+            const result = await operatorLogout();
+            if (result.success) {
+                alert(result.message);
+                window.location.href = 'operator-login.html';
+            } else {
+                alert('운영 종료 중 오류가 발생했습니다.');
+            }
+        });
+    </script>
+</body>
+</html>
