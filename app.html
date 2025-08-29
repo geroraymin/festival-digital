@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>청소년 축제 디지털 방명록 시스템</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .fade-in { animation: fadeIn 0.3s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .slide-in { animation: slideIn 0.3s ease-out; }
+        @keyframes slideIn { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- 로딩 화면 -->
+    <div id="loadingScreen" class="fixed inset-0 bg-white z-50 flex items-center justify-center">
+        <div class="text-center">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+            <p class="mt-4 text-gray-600">시스템 로딩 중...</p>
+        </div>
+    </div>
+
+    <!-- 메인 네비게이션 (로그인 후 표시) -->
+    <nav id="mainNav" class="hidden bg-white shadow-sm border-b">
+        <div class="container mx-auto px-4">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center space-x-8">
+                    <h1 class="text-xl font-bold text-gray-800">청소년 축제 디지털 방명록</h1>
+                    <div id="navMenu" class="hidden md:flex space-x-6">
+                        <!-- 역할별 메뉴 동적 생성 -->
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span id="userInfo" class="text-sm text-gray-600"></span>
+                    <button id="logoutBtn" class="text-sm text-red-600 hover:text-red-800">로그아웃</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 로그인 화면 -->
+    <div id="loginScreen" class="hidden min-h-screen flex items-center justify-center p-4">
+        <div class="w-full max-w-4xl">
+            <div class="text-center mb-8">
+                <h1 class="text-4xl font-bold text-gray-800 mb-2">청소년 축제 디지털 방명록</h1>
+                <p class="text-lg text-gray-600">로그인하여 시스템을 이용하세요</p>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-6">
+                <!-- 운영자 로그인 -->
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <div class="text-center mb-4">
+                        <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                            <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path>
+                            </svg>
+                        </div>
+                        <h2 class="text-xl font-bold mb-2">부스 운영자</h2>
+                        <p class="text-sm text-gray-600 mb-4">부스 코드로 로그인</p>
+                    </div>
+                    
+                    <form id="operatorLoginForm" class="space-y-3">
+                        <input type="text" id="boothCode" placeholder="부스 코드 (예: ABC123)" 
+                               maxlength="6" required
+                               class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 uppercase text-center text-lg font-bold">
+                        <input type="text" id="operatorName" placeholder="운영자 이름 (선택)"
+                               class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                        <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">
+                            운영자 로그인
+                        </button>
+                    </form>
+                </div>
+
+                <!-- 관리자 로그인 -->
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <div class="text-center mb-4">
+                        <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                            <svg class="w-8 h-8 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+                            </svg>
+                        </div>
+                        <h2 class="text-xl font-bold mb-2">시스템 관리자</h2>
+                        <p class="text-sm text-gray-600 mb-4">관리자 계정으로 로그인</p>
+                    </div>
+                    
+                    <form id="adminLoginForm" class="space-y-3">
+                        <input type="text" id="adminUsername" placeholder="사용자명" required
+                               class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-gray-500">
+                        <input type="password" id="adminPassword" placeholder="비밀번호" required
+                               class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-gray-500">
+                        <button type="submit" class="w-full bg-gray-800 text-white py-2 rounded-lg hover:bg-gray-900">
+                            관리자 로그인
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- 참가자 입장 -->
+            <div class="mt-6 text-center">
+                <p class="text-gray-600 mb-2">부스를 방문한 참가자이신가요?</p>
+                <button id="participantBtn" class="text-green-600 hover:text-green-800 font-medium">
+                    → 방명록 작성하기 (로그인 불필요)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 메인 컨텐츠 영역 -->
+    <div id="mainContent" class="hidden">
+        <div class="container mx-auto px-4 py-6">
+            <!-- 관리자 대시보드 -->
+            <div id="adminDashboard" class="hidden fade-in">
+                <!-- 통계 카드 -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                    <div class="bg-white rounded-lg shadow p-4">
+                        <div class="text-2xl font-bold text-blue-600" id="totalBooths">0</div>
+                        <div class="text-sm text-gray-600">전체 부스</div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-4">
+                        <div class="text-2xl font-bold text-green-600" id="activeOperations">0</div>
+                        <div class="text-sm text-gray-600">운영 중</div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-4">
+                        <div class="text-2xl font-bold text-purple-600" id="todayTotal">0</div>
+                        <div class="text-sm text-gray-600">오늘 참가자</div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-4">
+                        <div class="text-2xl font-bold text-orange-600" id="totalParticipants">0</div>
+                        <div class="text-sm text-gray-600">전체 참가자</div>
+                    </div>
+                </div>
+
+                <!-- 실시간 차트 -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <h3 class="font-bold mb-4">성별 분포</h3>
+                        <canvas id="genderChart"></canvas>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <h3 class="font-bold mb-4">학년별 분포</h3>
+                        <canvas id="gradeChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- 부스별 실시간 현황 -->
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h3 class="font-bold mb-4">부스별 운영 현황</h3>
+                    <div id="boothStatusList" class="space-y-2">
+                        <!-- 동적 생성 -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- 운영자 대시보드 -->
+            <div id="operatorDashboard" class="hidden fade-in">
+                <!-- 운영 정보 -->
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h2 class="text-xl font-bold text-blue-900" id="operatorBoothName">-</h2>
+                            <p class="text-blue-700">운영자: <span id="operatorNameDisplay">-</span></p>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-2xl font-bold text-blue-600" id="operationTime">0분</div>
+                            <div class="text-sm text-blue-700">운영 시간</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 통계 카드 -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    <div class="bg-white rounded-lg shadow p-4">
+                        <div class="text-xl font-bold text-green-600" id="opTotalCount">0</div>
+                        <div class="text-xs text-gray-600">오늘 참가자</div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-4">
+                        <div class="text-xl font-bold text-blue-600" id="opMaleCount">0</div>
+                        <div class="text-xs text-gray-600">남성</div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-4">
+                        <div class="text-xl font-bold text-pink-600" id="opFemaleCount">0</div>
+                        <div class="text-xs text-gray-600">여성</div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-4">
+                        <div class="text-xl font-bold text-purple-600" id="opAvgTime">0분</div>
+                        <div class="text-xs text-gray-600">평균 체류</div>
+                    </div>
+                </div>
+
+                <!-- 참가자 등록 폼 -->
+                <div class="bg-white rounded-lg shadow p-6 mb-6">
+                    <h3 class="font-bold mb-4">참가자 등록</h3>
+                    <form id="operatorParticipantForm" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <input type="text" name="name" placeholder="이름 *" required
+                               class="px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                        <select name="gender" required class="px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                            <option value="">성별 *</option>
+                            <option value="남">남성</option>
+                            <option value="여">여성</option>
+                        </select>
+                        <select name="grade" required class="px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                            <option value="">학년 *</option>
+                            <option value="초등학생">초등학생</option>
+                            <option value="중학생">중학생</option>
+                            <option value="고등학생">고등학생</option>
+                        </select>
+                        <input type="tel" name="phone" placeholder="연락처 (선택)"
+                               class="px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                        <textarea name="message" placeholder="메시지 (선택)" rows="2"
+                                  class="md:col-span-2 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"></textarea>
+                        <button type="submit" class="md:col-span-2 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">
+                            참가자 등록
+                        </button>
+                    </form>
+                </div>
+
+                <!-- 최근 참가자 목록 -->
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h3 class="font-bold mb-4">최근 참가자</h3>
+                    <div id="operatorRecentList" class="overflow-x-auto">
+                        <!-- 동적 생성 -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- 참가자 화면 -->
+            <div id="participantView" class="hidden fade-in">
+                <!-- 부스 선택 -->
+                <div id="boothSelection" class="max-w-4xl mx-auto">
+                    <h2 class="text-2xl font-bold text-center mb-6">부스를 선택하세요</h2>
+                    <div id="participantBoothList" class="grid md:grid-cols-3 gap-4">
+                        <!-- 동적 생성 -->
+                    </div>
+                </div>
+
+                <!-- 방명록 작성 폼 -->
+                <div id="guestbookForm" class="hidden max-w-md mx-auto">
+                    <div class="bg-white rounded-xl shadow-lg p-6">
+                        <button id="backToBooths" class="text-blue-600 hover:text-blue-800 mb-4">
+                            ← 부스 목록
+                        </button>
+                        <h2 class="text-xl font-bold mb-4" id="selectedBoothTitle">-</h2>
+                        
+                        <form id="participantGuestbookForm" class="space-y-4">
+                            <input type="text" name="name" placeholder="이름 *" required
+                                   class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500">
+                            <div class="grid grid-cols-2 gap-4">
+                                <select name="gender" required class="px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500">
+                                    <option value="">성별 *</option>
+                                    <option value="남">남성</option>
+                                    <option value="여">여성</option>
+                                </select>
+                                <select name="grade" required class="px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500">
+                                    <option value="">학년 *</option>
+                                    <option value="초등학생">초등학생</option>
+                                    <option value="중학생">중학생</option>
+                                    <option value="고등학생">고등학생</option>
+                                </select>
+                            </div>
+                            <textarea name="message" placeholder="메시지를 남겨주세요" rows="3"
+                                      class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"></textarea>
+                            <button type="submit" class="w-full bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-700">
+                                방명록 작성
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- 완료 메시지 -->
+                <div id="completionMsg" class="hidden max-w-md mx-auto">
+                    <div class="bg-white rounded-xl shadow-lg p-8 text-center">
+                        <div class="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <svg class="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                        </div>
+                        <h2 class="text-2xl font-bold mb-2">감사합니다!</h2>
+                        <p class="text-gray-600 mb-4">방명록이 등록되었습니다.</p>
+                        <button id="writeAnotherBtn" class="bg-purple-600 text-white py-2 px-6 rounded-lg hover:bg-purple-700">
+                            다른 부스 방명록 작성
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { supabase } from './src/js/supabase-client.js';
+        import { operatorLogin, operatorLogout, getOperatorSession, getCurrentBoothInfo, getOperationStats } from './src/js/operator-auth.js';
+        import { adminLogin } from './src/js/admin-auth.js';
+        import { getCurrentUser, getCurrentUserRole, USER_ROLES } from './src/js/auth-manager.js';
+
+        // 전역 변수
+        let currentView = null;
+        let selectedBoothId = null;
+        let updateInterval = null;
+
+        // 초기화
+        async function init() {
+            // 로딩 화면 숨기기
+            setTimeout(() => {
+                document.getElementById('loadingScreen').classList.add('hidden');
+                checkAuthAndRoute();
+            }, 1000);
+        }
+
+        // 인증 확인 및 라우팅
+        function checkAuthAndRoute() {
+            const role = getCurrentUserRole();
+            
+            if (role === USER_ROLES.ADMIN) {
+                showAdminDashboard();
+            } else if (role === USER_ROLES.OPERATOR) {
+                showOperatorDashboard();
+            } else {
+                showLoginScreen();
+            }
+        }
+
+        // 로그인 화면 표시
+        function showLoginScreen() {
+            hideAllScreens();
+            document.getElementById('loginScreen').classList.remove('hidden');
+            document.getElementById('mainNav').classList.add('hidden');
+        }
+
+        // 관리자 대시보드 표시
+        async function showAdminDashboard() {
+            hideAllScreens();
+            document.getElementById('mainNav').classList.remove('hidden');
+            document.getElementById('mainContent').classList.remove('hidden');
+            document.getElementById('adminDashboard').classList.remove('hidden');
+            
+            const user = getCurrentUser();
+            document.getElementById('userInfo').textContent = `관리자: ${user.username}`;
+            
+            // 네비게이션 메뉴 설정
+            document.getElementById('navMenu').innerHTML = `
+                <a href="#" class="text-gray-700 hover:text-blue-600">대시보드</a>
+                <a href="admin-dashboard.html" class="text-gray-700 hover:text-blue-600">상세 관리</a>
+            `;
+            
+            await loadAdminStats();
+            
+            // 30초마다 통계 업데이트
+            if (updateInterval) clearInterval(updateInterval);
+            updateInterval = setInterval(loadAdminStats, 30000);
+        }
+
+        // 운영자 대시보드 표시
+        async function showOperatorDashboard() {
+            hideAllScreens();
+            document.getElementById('mainNav').classList.remove('hidden');
+            document.getElementById('mainContent').classList.remove('hidden');
+            document.getElementById('operatorDashboard').classList.remove('hidden');
+            
+            const boothInfo = getCurrentBoothInfo();
+            document.getElementById('userInfo').textContent = `운영자: ${boothInfo.operatorName}`;
+            document.getElementById('operatorBoothName').textContent = boothInfo.boothName;
+            document.getElementById('operatorNameDisplay').textContent = boothInfo.operatorName;
+            
+            await loadOperatorStats();
+            
+            // 30초마다 통계 업데이트
+            if (updateInterval) clearInterval(updateInterval);
+            updateInterval = setInterval(loadOperatorStats, 30000);
+        }
+
+        // 참가자 화면 표시
+        async function showParticipantView() {
+            hideAllScreens();
+            document.getElementById('mainNav').classList.add('hidden');
+            document.getElementById('mainContent').classList.remove('hidden');
+            document.getElementById('participantView').classList.remove('hidden');
+            
+            await loadBoothsForParticipant();
+        }
+
+        // 모든 화면 숨기기
+        function hideAllScreens() {
+            document.getElementById('loginScreen').classList.add('hidden');
+            document.getElementById('mainContent').classList.add('hidden');
+            document.getElementById('adminDashboard').classList.add('hidden');
+            document.getElementById('operatorDashboard').classList.add('hidden');
+            document.getElementById('participantView').classList.add('hidden');
+        }
+
+        // 관리자 통계 로드
+        async function loadAdminStats() {
+            try {
+                // 부스 통계
+                const { data: booths } = await supabase.from('booths').select('*');
+                document.getElementById('totalBooths').textContent = booths?.length || 0;
+                
+                // 운영 중인 부스
+                const { data: operations } = await supabase
+                    .from('booth_operations')
+                    .select('*, booths(name)')
+                    .eq('is_active', true);
+                document.getElementById('activeOperations').textContent = operations?.length || 0;
+                
+                // 참가자 통계
+                const { data: participants } = await supabase.from('participants').select('*');
+                document.getElementById('totalParticipants').textContent = participants?.length || 0;
+                
+                // 오늘 참가자
+                const today = new Date().toISOString().split('T')[0];
+                const todayCount = participants?.filter(p => p.created_at.startsWith(today)).length || 0;
+                document.getElementById('todayTotal').textContent = todayCount;
+                
+                // 차트 업데이트
+                updateCharts(participants);
+                
+                // 부스별 현황
+                updateBoothStatus(booths, operations);
+            } catch (error) {
+                console.error('관리자 통계 로드 실패:', error);
+            }
+        }
+
+        // 운영자 통계 로드
+        async function loadOperatorStats() {
+            const stats = await getOperationStats();
+            if (stats) {
+                document.getElementById('opTotalCount').textContent = stats.total;
+                document.getElementById('opMaleCount').textContent = stats.male;
+                document.getElementById('opFemaleCount').textContent = stats.female;
+                document.getElementById('operationTime').textContent = `${stats.operationTime}분`;
+                
+                // 최근 참가자 로드
+                await loadRecentParticipants();
+            }
+        }
+
+        // 차트 업데이트
+        function updateCharts(participants) {
+            if (!participants || participants.length === 0) return;
+            
+            // 성별 차트
+            const genderCtx = document.getElementById('genderChart').getContext('2d');
+            new Chart(genderCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['남성', '여성'],
+                    datasets: [{
+                        data: [
+                            participants.filter(p => p.gender === '남').length,
+                            participants.filter(p => p.gender === '여').length
+                        ],
+                        backgroundColor: ['#3B82F6', '#EC4899']
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: true }
+            });
+            
+            // 학년 차트
+            const gradeCtx = document.getElementById('gradeChart').getContext('2d');
+            new Chart(gradeCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['초등학생', '중학생', '고등학생'],
+                    datasets: [{
+                        label: '참가자 수',
+                        data: [
+                            participants.filter(p => p.grade === '초등학생').length,
+                            participants.filter(p => p.grade === '중학생').length,
+                            participants.filter(p => p.grade === '고등학생').length
+                        ],
+                        backgroundColor: '#8B5CF6'
+                    }]
+                },
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: true,
+                    scales: { y: { beginAtZero: true } }
+                }
+            });
+        }
+
+        // 부스별 현황 업데이트
+        function updateBoothStatus(booths, operations) {
+            const listDiv = document.getElementById('boothStatusList');
+            
+            listDiv.innerHTML = booths.map(booth => {
+                const operation = operations?.find(op => op.booth_id === booth.id);
+                return `
+                    <div class="flex justify-between items-center p-3 border rounded-lg">
+                        <div>
+                            <div class="font-medium">${booth.name}</div>
+                            <div class="text-sm text-gray-600">코드: ${booth.booth_code || '미발급'}</div>
+                        </div>
+                        <div class="text-right">
+                            ${operation ? 
+                                `<span class="text-green-600 font-medium">운영 중</span>
+                                 <div class="text-sm text-gray-600">${operation.operator_name}</div>` :
+                                '<span class="text-gray-400">대기 중</span>'
+                            }
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // 최근 참가자 로드 (운영자용)
+        async function loadRecentParticipants() {
+            const boothInfo = getCurrentBoothInfo();
+            if (!boothInfo) return;
+            
+            try {
+                const { data } = await supabase
+                    .from('participants')
+                    .select('*')
+                    .eq('booth_id', boothInfo.boothId)
+                    .order('created_at', { ascending: false })
+                    .limit(5);
+                
+                const listDiv = document.getElementById('operatorRecentList');
+                
+                if (!data || data.length === 0) {
+                    listDiv.innerHTML = '<p class="text-gray-500">아직 참가자가 없습니다.</p>';
+                    return;
+                }
+                
+                listDiv.innerHTML = `
+                    <table class="w-full">
+                        <thead>
+                            <tr class="border-b">
+                                <th class="text-left py-2">시간</th>
+                                <th class="text-left py-2">이름</th>
+                                <th class="text-left py-2">성별</th>
+                                <th class="text-left py-2">학년</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${data.map(p => `
+                                <tr class="border-b">
+                                    <td class="py-2 text-sm">${new Date(p.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}</td>
+                                    <td class="py-2">${p.name}</td>
+                                    <td class="py-2">${p.gender}</td>
+                                    <td class="py-2">${p.grade}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            } catch (error) {
+                console.error('최근 참가자 로드 실패:', error);
+            }
+        }
+
+        // 참가자용 부스 목록 로드
+        async function loadBoothsForParticipant() {
+            try {
+                const { data: booths } = await supabase
+                    .from('booths')
+                    .select('*')
+                    .eq('is_active', true)
+                    .order('name');
+                
+                const listDiv = document.getElementById('participantBoothList');
+                
+                if (!booths || booths.length === 0) {
+                    listDiv.innerHTML = '<div class="col-span-full text-center text-gray-500">운영 중인 부스가 없습니다.</div>';
+                    return;
+                }
+                
+                listDiv.innerHTML = booths.map(booth => `
+                    <div class="bg-white rounded-lg shadow hover:shadow-lg p-6 cursor-pointer transition"
+                         onclick="selectBoothForGuestbook(${booth.id}, '${booth.name}')">
+                        <div class="text-center">
+                            <div class="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                                <svg class="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                                </svg>
+                            </div>
+                            <h3 class="font-bold">${booth.name}</h3>
+                            <p class="text-sm text-gray-600 mt-1">${booth.description || '방명록 작성'}</p>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('부스 목록 로드 실패:', error);
+            }
+        }
+
+        // 부스 선택 (참가자)
+        window.selectBoothForGuestbook = function(boothId, boothName) {
+            selectedBoothId = boothId;
+            document.getElementById('selectedBoothTitle').textContent = boothName;
+            document.getElementById('boothSelection').classList.add('hidden');
+            document.getElementById('guestbookForm').classList.remove('hidden');
+        };
+
+        // 이벤트 리스너들
+        
+        // 운영자 로그인
+        document.getElementById('operatorLoginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const code = document.getElementById('boothCode').value;
+            const name = document.getElementById('operatorName').value || `운영자_${Date.now().toString(36).toUpperCase()}`;
+            
+            const result = await operatorLogin(code, { name, phone: null });
+            
+            if (result.success) {
+                alert(result.message);
+                showOperatorDashboard();
+            } else {
+                alert(result.message);
+            }
+        });
+
+        // 관리자 로그인
+        document.getElementById('adminLoginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('adminUsername').value;
+            const password = document.getElementById('adminPassword').value;
+            
+            const result = await adminLogin(username, password);
+            
+            if (result.success) {
+                localStorage.setItem('admin_session', JSON.stringify({
+                    username: result.user.username,
+                    role: result.role,
+                    loginTime: new Date().toISOString()
+                }));
+                alert('관리자 로그인 성공!');
+                showAdminDashboard();
+            } else {
+                alert('잘못된 사용자명 또는 비밀번호입니다.');
+            }
+        });
+
+        // 참가자 입장
+        document.getElementById('participantBtn').addEventListener('click', () => {
+            showParticipantView();
+        });
+
+        // 로그아웃
+        document.getElementById('logoutBtn').addEventListener('click', async () => {
+            const role = getCurrentUserRole();
+            
+            if (role === USER_ROLES.ADMIN) {
+                localStorage.removeItem('admin_session');
+                alert('로그아웃되었습니다.');
+            } else if (role === USER_ROLES.OPERATOR) {
+                await operatorLogout();
+                alert('부스 운영을 종료했습니다.');
+            }
+            
+            if (updateInterval) clearInterval(updateInterval);
+            showLoginScreen();
+        });
+
+        // 운영자 참가자 등록
+        document.getElementById('operatorParticipantForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const boothInfo = getCurrentBoothInfo();
+            if (!boothInfo) return;
+            
+            const formData = new FormData(e.target);
+            const data = {
+                booth_id: boothInfo.boothId,
+                name: formData.get('name'),
+                gender: formData.get('gender'),
+                grade: formData.get('grade'),
+                phone: formData.get('phone') || null,
+                message: formData.get('message') || null,
+                created_at: new Date().toISOString()
+            };
+            
+            try {
+                await supabase.from('participants').insert(data);
+                alert('참가자가 등록되었습니다.');
+                e.target.reset();
+                loadOperatorStats();
+            } catch (error) {
+                alert('등록 실패: ' + error.message);
+            }
+        });
+
+        // 참가자 방명록 작성
+        document.getElementById('participantGuestbookForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!selectedBoothId) return;
+            
+            const formData = new FormData(e.target);
+            const data = {
+                booth_id: selectedBoothId,
+                name: formData.get('name'),
+                gender: formData.get('gender'),
+                grade: formData.get('grade'),
+                message: formData.get('message') || null,
+                created_at: new Date().toISOString()
+            };
+            
+            try {
+                await supabase.from('participants').insert(data);
+                document.getElementById('guestbookForm').classList.add('hidden');
+                document.getElementById('completionMsg').classList.remove('hidden');
+                e.target.reset();
+            } catch (error) {
+                alert('방명록 작성 실패: ' + error.message);
+            }
+        });
+
+        // 부스 목록으로 돌아가기
+        document.getElementById('backToBooths').addEventListener('click', () => {
+            document.getElementById('guestbookForm').classList.add('hidden');
+            document.getElementById('boothSelection').classList.remove('hidden');
+        });
+
+        // 다른 부스 방명록 작성
+        document.getElementById('writeAnotherBtn').addEventListener('click', () => {
+            document.getElementById('completionMsg').classList.add('hidden');
+            document.getElementById('boothSelection').classList.remove('hidden');
+            selectedBoothId = null;
+        });
+
+        // 부스 코드 자동 대문자 변환
+        document.getElementById('boothCode').addEventListener('input', (e) => {
+            e.target.value = e.target.value.toUpperCase();
+        });
+
+        // 앱 초기화
+        init();
+    </script>
+</body>
+</html>
