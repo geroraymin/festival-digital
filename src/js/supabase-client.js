@@ -7,8 +7,23 @@
 const SUPABASE_URL = 'https://jxvctchiwgbduzlkvohg.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp4dmN0Y2hpd2diZHV6bGt2b2hnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzU0MDY2MzQsImV4cCI6MjA1MDk4MjYzNH0.5MqGRA7kQbyPHDaVEA5D68R5M8J8zTThQWRi-5Xh2n0';
 
-// Supabase 클라이언트 초기화
-export const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// Supabase 클라이언트 초기화 (라이브러리 미로딩 대비)
+const supabaseLib = typeof window !== 'undefined' ? window.supabase : undefined;
+export const supabase = supabaseLib ? supabaseLib.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+
+/**
+ * Supabase 인스턴스 가져오기
+ * - Mock 모드가 활성화되어 있으면 null 반환
+ */
+export function getSupabase() {
+    try {
+        if (isInMockMode()) return null;
+        if (!supabase) return null;
+        return supabase;
+    } catch (e) {
+        return null;
+    }
+}
 
 /**
  * Supabase 연결 상태 확인
