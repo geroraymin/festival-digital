@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>관리자 대시보드 - 청소년 축제 디지털 방명록</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-gray-50">
+    <!-- 네비게이션 -->
+    <nav class="bg-gray-800 text-white p-4 shadow-lg">
+        <div class="container mx-auto flex justify-between items-center">
+            <h1 class="text-xl font-bold">관리자 대시보드</h1>
+            <div class="flex items-center space-x-4">
+                <span id="adminName" class="text-sm">관리자</span>
+                <button id="logoutBtn" class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded text-sm">
+                    로그아웃
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 메인 컨텐츠 -->
+    <div class="container mx-auto px-4 py-6">
+        <!-- 탭 메뉴 -->
+        <div class="border-b border-gray-200 mb-6">
+            <nav class="-mb-px flex space-x-8">
+                <button class="tab-btn py-2 px-1 border-b-2 font-medium text-sm border-indigo-500 text-indigo-600" 
+                        data-tab="overview">
+                    전체 현황
+                </button>
+                <button class="tab-btn py-2 px-1 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700" 
+                        data-tab="booths">
+                    부스 관리
+                </button>
+                <button class="tab-btn py-2 px-1 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700" 
+                        data-tab="codes">
+                    부스 코드 관리
+                </button>
+                <button class="tab-btn py-2 px-1 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700" 
+                        data-tab="operators">
+                    운영자 현황
+                </button>
+                <button class="tab-btn py-2 px-1 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700" 
+                        data-tab="stats">
+                    통계
+                </button>
+            </nav>
+        </div>
+
+        <!-- 탭 컨텐츠 -->
+        <!-- 전체 현황 탭 -->
+        <div id="overview-tab" class="tab-content">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="text-2xl font-bold text-gray-800" id="totalBooths">0</div>
+                    <div class="text-sm text-gray-600">전체 부스</div>
+                </div>
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="text-2xl font-bold text-green-600" id="activeBooths">0</div>
+                    <div class="text-sm text-gray-600">운영 중 부스</div>
+                </div>
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="text-2xl font-bold text-blue-600" id="todayParticipants">0</div>
+                    <div class="text-sm text-gray-600">오늘 참가자</div>
+                </div>
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="text-2xl font-bold text-purple-600" id="totalParticipants">0</div>
+                    <div class="text-sm text-gray-600">전체 참가자</div>
+                </div>
+            </div>
+
+            <!-- 실시간 운영 현황 -->
+            <div class="bg-white rounded-lg shadow p-6">
+                <h2 class="text-lg font-bold mb-4">실시간 운영 현황</h2>
+                <div id="realtimeStatus" class="space-y-2">
+                    <div class="text-gray-500">데이터를 불러오는 중...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 부스 관리 탭 -->
+        <div id="booths-tab" class="tab-content hidden">
+            <div class="bg-white rounded-lg shadow">
+                <div class="p-6 border-b">
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-lg font-bold">부스 목록</h2>
+                        <button id="addBoothBtn" class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700">
+                            새 부스 추가
+                        </button>
+                    </div>
+                </div>
+                <div class="p-6">
+                    <table class="w-full">
+                        <thead>
+                            <tr class="border-b">
+                                <th class="text-left py-2">부스명</th>
+                                <th class="text-left py-2">설명</th>
+                                <th class="text-left py-2">상태</th>
+                                <th class="text-left py-2">참가자 수</th>
+                                <th class="text-left py-2">작업</th>
+                            </tr>
+                        </thead>
+                        <tbody id="boothsList">
+                            <tr>
+                                <td colspan="5" class="text-center py-4 text-gray-500">
+                                    데이터를 불러오는 중...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 부스 코드 관리 탭 -->
+        <div id="codes-tab" class="tab-content hidden">
+            <div class="bg-white rounded-lg shadow">
+                <div class="p-6 border-b">
+                    <h2 class="text-lg font-bold">부스 코드 관리</h2>
+                    <p class="text-sm text-gray-600 mt-1">운영자에게 제공할 부스별 접속 코드를 관리합니다</p>
+                </div>
+                <div class="p-6">
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead>
+                                <tr class="border-b">
+                                    <th class="text-left py-3">부스명</th>
+                                    <th class="text-left py-3">부스 코드</th>
+                                    <th class="text-left py-3">만료일</th>
+                                    <th class="text-left py-3">상태</th>
+                                    <th class="text-left py-3">작업</th>
+                                </tr>
+                            </thead>
+                            <tbody id="codesList">
+                                <tr>
+                                    <td colspan="5" class="text-center py-4 text-gray-500">
+                                        데이터를 불러오는 중...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 운영자 현황 탭 -->
+        <div id="operators-tab" class="tab-content hidden">
+            <div class="bg-white rounded-lg shadow">
+                <div class="p-6 border-b">
+                    <h2 class="text-lg font-bold">운영자 현황</h2>
+                    <p class="text-sm text-gray-600 mt-1">현재 운영 중인 부스와 운영자 정보</p>
+                </div>
+                <div class="p-6">
+                    <div id="operatorsList" class="space-y-4">
+                        <div class="text-center py-4 text-gray-500">
+                            데이터를 불러오는 중...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 통계 탭 -->
+        <div id="stats-tab" class="tab-content hidden">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- 성별 통계 -->
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h3 class="text-lg font-bold mb-4">성별 분포</h3>
+                    <canvas id="genderChart"></canvas>
+                </div>
+
+                <!-- 학년 통계 -->
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h3 class="text-lg font-bold mb-4">학년별 분포</h3>
+                    <canvas id="gradeChart"></canvas>
+                </div>
+
+                <!-- 시간대별 통계 -->
+                <div class="bg-white rounded-lg shadow p-6 lg:col-span-2">
+                    <h3 class="text-lg font-bold mb-4">시간대별 참가자</h3>
+                    <canvas id="timeChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 부스 추가 모달 -->
+    <div id="addBoothModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-6 w-full max-w-md">
+            <h3 class="text-lg font-bold mb-4">새 부스 추가</h3>
+            <form id="addBoothForm" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">부스명</label>
+                    <input type="text" name="name" required 
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">설명</label>
+                    <textarea name="description" rows="3" 
+                              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"></textarea>
+                </div>
+                <div class="flex justify-end space-x-3">
+                    <button type="button" id="cancelAddBooth" 
+                            class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">
+                        취소
+                    </button>
+                    <button type="submit" 
+                            class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">
+                        추가
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- JavaScript -->
+    <script type="module">
+        import { supabase } from './src/js/supabase-client.js';
+        import { getAllBoothCodes, assignCodeToBooth, regenerateBoothCode } from './src/js/booth-code.js';
+
+        // 관리자 세션 확인
+        const adminSession = JSON.parse(localStorage.getItem('admin_session') || '{}');
+        if (!adminSession.username) {
+            alert('관리자 로그인이 필요합니다.');
+            window.location.href = 'admin-login.html';
+        }
+
+        document.getElementById('adminName').textContent = adminSession.username;
+
+        // 로그아웃
+        document.getElementById('logoutBtn').addEventListener('click', function() {
+            localStorage.removeItem('admin_session');
+            window.location.href = 'admin-login.html';
+        });
+
+        // 탭 전환
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                // 모든 탭 버튼 스타일 초기화
+                document.querySelectorAll('.tab-btn').forEach(b => {
+                    b.classList.remove('border-indigo-500', 'text-indigo-600');
+                    b.classList.add('border-transparent', 'text-gray-500');
+                });
+                
+                // 선택된 탭 스타일 적용
+                this.classList.remove('border-transparent', 'text-gray-500');
+                this.classList.add('border-indigo-500', 'text-indigo-600');
+                
+                // 모든 탭 컨텐츠 숨기기
+                document.querySelectorAll('.tab-content').forEach(content => {
+                    content.classList.add('hidden');
+                });
+                
+                // 선택된 탭 컨텐츠 보이기
+                const tabName = this.dataset.tab;
+                document.getElementById(`${tabName}-tab`).classList.remove('hidden');
+                
+                // 탭별 데이터 로드
+                loadTabData(tabName);
+            });
+        });
+
+        // 탭별 데이터 로드 함수
+        async function loadTabData(tabName) {
+            switch(tabName) {
+                case 'overview':
+                    await loadOverview();
+                    break;
+                case 'booths':
+                    await loadBooths();
+                    break;
+                case 'codes':
+                    await loadBoothCodes();
+                    break;
+                case 'operators':
+                    await loadOperators();
+                    break;
+                case 'stats':
+                    await loadStats();
+                    break;
+            }
+        }
+
+        // 전체 현황 로드
+        async function loadOverview() {
+            try {
+                // 부스 수 조회
+                const { data: booths } = await supabase.from('booths').select('*');
+                document.getElementById('totalBooths').textContent = booths?.length || 0;
+                
+                // 운영 중 부스 조회
+                const { data: operations } = await supabase
+                    .from('booth_operations')
+                    .select('*')
+                    .eq('is_active', true);
+                document.getElementById('activeBooths').textContent = operations?.length || 0;
+                
+                // 참가자 수 조회
+                const { data: participants } = await supabase.from('participants').select('*');
+                document.getElementById('totalParticipants').textContent = participants?.length || 0;
+                
+                // 오늘 참가자
+                const today = new Date().toISOString().split('T')[0];
+                const todayCount = participants?.filter(p => 
+                    p.created_at.startsWith(today)
+                ).length || 0;
+                document.getElementById('todayParticipants').textContent = todayCount;
+                
+                // 실시간 운영 현황
+                updateRealtimeStatus(booths, operations);
+            } catch (error) {
+                console.error('전체 현황 로드 실패:', error);
+            }
+        }
+
+        // 실시간 운영 현황 업데이트
+        function updateRealtimeStatus(booths, operations) {
+            const statusDiv = document.getElementById('realtimeStatus');
+            
+            if (!booths || booths.length === 0) {
+                statusDiv.innerHTML = '<div class="text-gray-500">등록된 부스가 없습니다.</div>';
+                return;
+            }
+            
+            const html = booths.map(booth => {
+                const operation = operations?.find(op => op.booth_id === booth.id);
+                return `
+                    <div class="flex justify-between items-center p-3 border rounded">
+                        <div>
+                            <div class="font-medium">${booth.name}</div>
+                            <div class="text-sm text-gray-600">코드: ${booth.booth_code || '미발급'}</div>
+                        </div>
+                        <div class="text-right">
+                            ${operation ? 
+                                `<span class="text-green-600">운영 중</span>
+                                 <div class="text-sm text-gray-600">${operation.operator_name}</div>` :
+                                '<span class="text-gray-400">대기 중</span>'
+                            }
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            statusDiv.innerHTML = html;
+        }
+
+        // 부스 목록 로드
+        async function loadBooths() {
+            try {
+                const { data: booths } = await supabase
+                    .from('booths')
+                    .select('*')
+                    .order('name');
+                
+                const tbody = document.getElementById('boothsList');
+                
+                if (!booths || booths.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-gray-500">등록된 부스가 없습니다.</td></tr>';
+                    return;
+                }
+                
+                tbody.innerHTML = booths.map(booth => `
+                    <tr class="border-b">
+                        <td class="py-3">${booth.name}</td>
+                        <td class="py-3">${booth.description || '-'}</td>
+                        <td class="py-3">
+                            <span class="px-2 py-1 text-xs rounded ${booth.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">
+                                ${booth.is_active ? '활성' : '비활성'}
+                            </span>
+                        </td>
+                        <td class="py-3">0</td>
+                        <td class="py-3">
+                            <button class="text-indigo-600 hover:text-indigo-800 text-sm">편집</button>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                console.error('부스 목록 로드 실패:', error);
+            }
+        }
+
+        // 부스 코드 목록 로드
+        async function loadBoothCodes() {
+            try {
+                const codes = await getAllBoothCodes();
+                const tbody = document.getElementById('codesList');
+                
+                if (!codes || codes.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-gray-500">등록된 부스가 없습니다.</td></tr>';
+                    return;
+                }
+                
+                tbody.innerHTML = codes.map(booth => {
+                    const hasCode = booth.booth_code && booth.booth_code.trim() !== '';
+                    const isExpired = booth.code_expires_at && new Date(booth.code_expires_at) < new Date();
+                    
+                    return `
+                        <tr class="border-b">
+                            <td class="py-3">${booth.name}</td>
+                            <td class="py-3">
+                                ${hasCode ? 
+                                    `<span class="font-mono text-lg font-bold">${booth.booth_code}</span>` : 
+                                    '<span class="text-gray-400">미발급</span>'
+                                }
+                            </td>
+                            <td class="py-3">
+                                ${booth.code_expires_at ? 
+                                    new Date(booth.code_expires_at).toLocaleDateString() : 
+                                    '-'
+                                }
+                            </td>
+                            <td class="py-3">
+                                ${hasCode ? 
+                                    (isExpired ? 
+                                        '<span class="text-red-600">만료됨</span>' : 
+                                        '<span class="text-green-600">유효</span>'
+                                    ) : 
+                                    '<span class="text-gray-400">-</span>'
+                                }
+                            </td>
+                            <td class="py-3 space-x-2">
+                                ${hasCode ? 
+                                    `<button onclick="regenerateCode(${booth.id})" class="text-blue-600 hover:text-blue-800 text-sm">재생성</button>
+                                     <button onclick="copyCode('${booth.booth_code}')" class="text-gray-600 hover:text-gray-800 text-sm">복사</button>` :
+                                    `<button onclick="generateCode(${booth.id})" class="text-indigo-600 hover:text-indigo-800 text-sm">코드 생성</button>`
+                                }
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (error) {
+                console.error('부스 코드 목록 로드 실패:', error);
+            }
+        }
+
+        // 운영자 현황 로드
+        async function loadOperators() {
+            try {
+                const { data: operations } = await supabase
+                    .from('booth_operations')
+                    .select(`
+                        *,
+                        booths (name)
+                    `)
+                    .eq('is_active', true)
+                    .order('started_at', { ascending: false });
+                
+                const operatorsDiv = document.getElementById('operatorsList');
+                
+                if (!operations || operations.length === 0) {
+                    operatorsDiv.innerHTML = '<div class="text-center py-4 text-gray-500">현재 운영 중인 부스가 없습니다.</div>';
+                    return;
+                }
+                
+                operatorsDiv.innerHTML = operations.map(op => {
+                    const startTime = new Date(op.started_at);
+                    const duration = Math.floor((new Date() - startTime) / 1000 / 60);
+                    
+                    return `
+                        <div class="border rounded-lg p-4">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <h4 class="font-bold">${op.booths?.name || '알 수 없는 부스'}</h4>
+                                    <p class="text-sm text-gray-600">운영자: ${op.operator_name}</p>
+                                    ${op.operator_phone ? `<p class="text-sm text-gray-600">연락처: ${op.operator_phone}</p>` : ''}
+                                    <p class="text-sm text-gray-600">시작: ${startTime.toLocaleString()}</p>
+                                </div>
+                                <div class="text-right">
+                                    <div class="text-2xl font-bold text-indigo-600">${duration}분</div>
+                                    <div class="text-sm text-gray-600">운영 시간</div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            } catch (error) {
+                console.error('운영자 현황 로드 실패:', error);
+            }
+        }
+
+        // 통계 로드
+        async function loadStats() {
+            try {
+                const { data: participants } = await supabase
+                    .from('participants')
+                    .select('*');
+                
+                if (!participants || participants.length === 0) {
+                    return;
+                }
+                
+                // 성별 통계
+                const genderData = {
+                    남: participants.filter(p => p.gender === '남').length,
+                    여: participants.filter(p => p.gender === '여').length
+                };
+                
+                // 학년 통계
+                const gradeData = {
+                    초등학생: participants.filter(p => p.grade === '초등학생').length,
+                    중학생: participants.filter(p => p.grade === '중학생').length,
+                    고등학생: participants.filter(p => p.grade === '고등학생').length
+                };
+                
+                // 차트 그리기
+                drawGenderChart(genderData);
+                drawGradeChart(gradeData);
+            } catch (error) {
+                console.error('통계 로드 실패:', error);
+            }
+        }
+
+        // 성별 차트 그리기
+        function drawGenderChart(data) {
+            const ctx = document.getElementById('genderChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(data),
+                    datasets: [{
+                        data: Object.values(data),
+                        backgroundColor: ['#3B82F6', '#EC4899']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true
+                }
+            });
+        }
+
+        // 학년 차트 그리기
+        function drawGradeChart(data) {
+            const ctx = document.getElementById('gradeChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(data),
+                    datasets: [{
+                        label: '참가자 수',
+                        data: Object.values(data),
+                        backgroundColor: '#8B5CF6'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        // 코드 생성
+        window.generateCode = async function(boothId) {
+            if (confirm('이 부스에 새 코드를 생성하시겠습니까?')) {
+                const result = await assignCodeToBooth(boothId);
+                if (result.success) {
+                    alert(`부스 코드가 생성되었습니다: ${result.code}`);
+                    loadBoothCodes();
+                } else {
+                    alert('코드 생성에 실패했습니다.');
+                }
+            }
+        };
+
+        // 코드 재생성
+        window.regenerateCode = async function(boothId) {
+            if (confirm('기존 코드를 무효화하고 새 코드를 생성하시겠습니까?')) {
+                const result = await regenerateBoothCode(boothId);
+                if (result.success) {
+                    alert(`새 부스 코드가 생성되었습니다: ${result.code}`);
+                    loadBoothCodes();
+                } else {
+                    alert('코드 재생성에 실패했습니다.');
+                }
+            }
+        };
+
+        // 코드 복사
+        window.copyCode = function(code) {
+            navigator.clipboard.writeText(code).then(() => {
+                alert(`부스 코드 ${code}가 클립보드에 복사되었습니다.`);
+            });
+        };
+
+        // 부스 추가 모달
+        document.getElementById('addBoothBtn').addEventListener('click', function() {
+            document.getElementById('addBoothModal').classList.remove('hidden');
+        });
+
+        document.getElementById('cancelAddBooth').addEventListener('click', function() {
+            document.getElementById('addBoothModal').classList.add('hidden');
+        });
+
+        // 부스 추가 폼 제출
+        document.getElementById('addBoothForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const boothData = {
+                name: formData.get('name'),
+                description: formData.get('description'),
+                is_active: true,
+                created_at: new Date().toISOString()
+            };
+            
+            try {
+                const { data, error } = await supabase
+                    .from('booths')
+                    .insert(boothData)
+                    .select();
+                
+                if (error) throw error;
+                
+                alert('부스가 추가되었습니다.');
+                document.getElementById('addBoothModal').classList.add('hidden');
+                this.reset();
+                loadBooths();
+            } catch (error) {
+                console.error('부스 추가 실패:', error);
+                alert('부스 추가에 실패했습니다.');
+            }
+        });
+
+        // 초기 로드
+        loadOverview();
+    </script>
+</body>
+</html>
