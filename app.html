@@ -289,15 +289,230 @@
     </div>
 
     <script type="module">
-        import { supabase } from './src/js/supabase-client.js';
-        import { operatorLogin, operatorLogout, getOperatorSession, getCurrentBoothInfo, getOperationStats } from './src/js/operator-auth.js';
-        import { adminLogin } from './src/js/admin-auth.js';
-        import { getCurrentUser, getCurrentUserRole, USER_ROLES } from './src/js/auth-manager.js';
+        // Supabase 클라이언트 직접 초기화
+        const SUPABASE_URL = 'https://jxvctchiwgbduzlkvohg.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp4dmN0Y2hpd2diZHV6bGt2b2hnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzU0MDY2MzQsImV4cCI6MjA1MDk4MjYzNH0.5MqGRA7kQbyPHDaVEA5D68R5M8J8zTThQWRi-5Xh2n0';
+        const { createClient } = supabase;
+        const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
+        // 간단한 인증 함수들 (모듈 import 대신 직접 구현)
+        const USER_ROLES = {
+            ADMIN: 'admin',
+            OPERATOR: 'operator', 
+            GUEST: 'guest'
+        };
 
         // 전역 변수
         let currentView = null;
         let selectedBoothId = null;
         let updateInterval = null;
+        let operatorSession = null;
+        
+        // 운영자 세션 관리 함수들
+        function getOperatorSession() {
+            const sessionStr = localStorage.getItem('operator_session');
+            if (!sessionStr) return null;
+            try {
+                return JSON.parse(sessionStr);
+            } catch (e) {
+                return null;
+            }
+        }
+        
+        function saveOperatorSession(session) {
+            operatorSession = session;
+            localStorage.setItem('operator_session', JSON.stringify(session));
+        }
+        
+        function clearOperatorSession() {
+            operatorSession = null;
+            localStorage.removeItem('operator_session');
+        }
+        
+        // 관리자 로그인 함수
+        async function adminLogin(username, password) {
+            if (username === 'admin' && password === '0627') {
+                return { 
+                    success: true, 
+                    user: { username: 'admin', id: 1 }, 
+                    role: 'admin' 
+                };
+            }
+            return { 
+                success: false, 
+                message: '잘못된 사용자명 또는 비밀번호입니다.' 
+            };
+        }
+        
+        // 운영자 로그인 함수
+        async function operatorLogin(boothCode, operatorInfo) {
+            try {
+                // 부스 코드 검증
+                const { data: booth, error } = await supabaseClient
+                    .from('booths')
+                    .select('*')
+                    .eq('booth_code', boothCode)
+                    .single();
+                
+                if (error || !booth) {
+                    return { success: false, message: '잘못된 부스 코드입니다.' };
+                }
+                
+                if (!booth.is_active) {
+                    return { success: false, message: '비활성화된 부스입니다.' };
+                }
+                
+                // 운영 시작 기록
+                const { data: operation, error: opError } = await supabaseClient
+                    .from('booth_operations')
+                    .insert({
+                        booth_id: booth.id,
+                        operator_name: operatorInfo.name,
+                        operator_phone: operatorInfo.phone || null,
+                        started_at: new Date().toISOString(),
+                        is_active: true
+                    })
+                    .select()
+                    .single();
+                
+                if (opError) throw opError;
+                
+                // 세션 생성
+                const session = {
+                    operationId: operation.id,
+                    boothId: booth.id,
+                    boothName: booth.name,
+                    operatorName: operatorInfo.name,
+                    role: 'operator',
+                    startedAt: new Date().toISOString()
+                };
+                
+                saveOperatorSession(session);
+                
+                return {
+                    success: true,
+                    session: session,
+                    message: `${booth.name} 부스 운영을 시작합니다.`
+                };
+            } catch (error) {
+                console.error('운영자 로그인 실패:', error);
+                return { success: false, message: '로그인 처리 중 오류가 발생했습니다.' };
+            }
+        }
+        
+        // 운영자 로그아웃 함수
+        async function operatorLogout() {
+            const session = getOperatorSession();
+            if (session && session.operationId) {
+                try {
+                    await supabaseClient
+                        .from('booth_operations')
+                        .update({
+                            is_active: false,
+                            ended_at: new Date().toISOString()
+                        })
+                        .eq('id', session.operationId);
+                } catch (error) {
+                    console.error('운영 종료 실패:', error);
+                }
+            }
+            clearOperatorSession();
+            return { success: true, message: '부스 운영을 종료했습니다.' };
+        }
+        
+        // 현재 부스 정보 가져오기
+        function getCurrentBoothInfo() {
+            const session = getOperatorSession();
+            if (!session) return null;
+            return {
+                boothId: session.boothId,
+                boothName: session.boothName,
+                operatorName: session.operatorName,
+                startedAt: session.startedAt
+            };
+        }
+        
+        // 운영 통계 가져오기
+        async function getOperationStats() {
+            try {
+                const session = getOperatorSession();
+                if (!session) return null;
+                
+                const startTime = new Date(session.startedAt);
+                
+                const { data, error } = await supabaseClient
+                    .from('participants')
+                    .select('*')
+                    .eq('booth_id', session.boothId)
+                    .gte('created_at', startTime.toISOString());
+                
+                if (error) throw error;
+                
+                return {
+                    total: data.length,
+                    male: data.filter(p => p.gender === '남').length,
+                    female: data.filter(p => p.gender === '여').length,
+                    elementary: data.filter(p => p.grade === '초등학생').length,
+                    middle: data.filter(p => p.grade === '중학생').length,
+                    high: data.filter(p => p.grade === '고등학생').length,
+                    operationTime: Math.floor((new Date() - startTime) / 1000 / 60)
+                };
+            } catch (error) {
+                console.error('통계 조회 실패:', error);
+                return null;
+            }
+        }
+        
+        // 현재 사용자 역할 가져오기
+        function getCurrentUserRole() {
+            const adminSession = localStorage.getItem('admin_session');
+            if (adminSession) {
+                try {
+                    const session = JSON.parse(adminSession);
+                    if (session.role === 'admin') {
+                        return USER_ROLES.ADMIN;
+                    }
+                } catch (e) {}
+            }
+            
+            const operatorSession = getOperatorSession();
+            if (operatorSession && operatorSession.role === 'operator') {
+                return USER_ROLES.OPERATOR;
+            }
+            
+            return USER_ROLES.GUEST;
+        }
+        
+        // 현재 사용자 정보 가져오기
+        function getCurrentUser() {
+            const role = getCurrentUserRole();
+            
+            if (role === USER_ROLES.ADMIN) {
+                const adminSession = JSON.parse(localStorage.getItem('admin_session') || '{}');
+                return {
+                    role: USER_ROLES.ADMIN,
+                    username: adminSession.username,
+                    name: '관리자'
+                };
+            }
+            
+            if (role === USER_ROLES.OPERATOR) {
+                const operatorSession = getOperatorSession();
+                return {
+                    role: USER_ROLES.OPERATOR,
+                    username: operatorSession.operatorName,
+                    name: operatorSession.operatorName,
+                    boothId: operatorSession.boothId,
+                    boothName: operatorSession.boothName
+                };
+            }
+            
+            return {
+                role: USER_ROLES.GUEST,
+                username: 'guest',
+                name: '방문자'
+            };
+        }
 
         // 초기화
         async function init() {
@@ -393,18 +608,18 @@
         async function loadAdminStats() {
             try {
                 // 부스 통계
-                const { data: booths } = await supabase.from('booths').select('*');
+                const { data: booths } = await supabaseClient.from('booths').select('*');
                 document.getElementById('totalBooths').textContent = booths?.length || 0;
                 
                 // 운영 중인 부스
-                const { data: operations } = await supabase
+                const { data: operations } = await supabaseClient
                     .from('booth_operations')
                     .select('*, booths(name)')
                     .eq('is_active', true);
                 document.getElementById('activeOperations').textContent = operations?.length || 0;
                 
                 // 참가자 통계
-                const { data: participants } = await supabase.from('participants').select('*');
+                const { data: participants } = await supabaseClient.from('participants').select('*');
                 document.getElementById('totalParticipants').textContent = participants?.length || 0;
                 
                 // 오늘 참가자
@@ -511,7 +726,7 @@
             if (!boothInfo) return;
             
             try {
-                const { data } = await supabase
+                const { data } = await supabaseClient
                     .from('participants')
                     .select('*')
                     .eq('booth_id', boothInfo.boothId)
@@ -555,7 +770,7 @@
         // 참가자용 부스 목록 로드
         async function loadBoothsForParticipant() {
             try {
-                const { data: booths } = await supabase
+                const { data: booths } = await supabaseClient
                     .from('booths')
                     .select('*')
                     .eq('is_active', true)
@@ -673,7 +888,7 @@
             };
             
             try {
-                await supabase.from('participants').insert(data);
+                await supabaseClient.from('participants').insert(data);
                 alert('참가자가 등록되었습니다.');
                 e.target.reset();
                 loadOperatorStats();
@@ -698,7 +913,7 @@
             };
             
             try {
-                await supabase.from('participants').insert(data);
+                await supabaseClient.from('participants').insert(data);
                 document.getElementById('guestbookForm').classList.add('hidden');
                 document.getElementById('completionMsg').classList.remove('hidden');
                 e.target.reset();
