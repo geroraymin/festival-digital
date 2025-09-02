@@ -355,7 +355,7 @@
                         <div id="booth-dashboard-mode" class="${dashboardActive ? '' : 'hidden'}">
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                                 <div class="bg-white p-6 rounded-xl shadow"><h3 class="text-slate-500 font-medium">현재 부스 참여 인원</h3><p class="text-4xl font-bold mt-2 text-blue-600">${participantsForBooth.length}</p></div>
-                                <div class="bg-white p-6 rounded-xl shadow"><h3 class="text-slate-500 font-medium">최근 참여</h3><p class="text-4xl font-bold mt-2 text-slate-800">N/A</p></div>
+                                <div class="bg-white p-6 rounded-xl shadow"><h3 class="text-slate-500 font-medium">최근 1시간 참여</h3><p class="text-4xl font-bold mt-2 text-green-600">${this.getRecentParticipants(participantsForBooth)}</p></div>
                             </div>
                             <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
                                 <div class="bg-white p-6 rounded-xl shadow"><h3 class="font-semibold text-slate-800">성별 분포</h3><div class="chart-container h-80"><canvas id="gender-chart-booth"></canvas></div></div>
@@ -571,9 +571,30 @@
                 this.showLoading(false);
             },
             
-            selectBooth(id) {
+            async selectBooth(id) {
                 this.state.selectedBoothId = id;
                 this.state.currentView = 'boothDashboard';
+                
+                // 부스 운영 시작 기록
+                if (this.supabase) {
+                    try {
+                        const { error } = await this.supabase
+                            .from('booth_operations')
+                            .insert({
+                                booth_id: id,
+                                operation_type: 'start',
+                                operator_name: this.state.user?.email || 'Unknown',
+                                is_active: true
+                            });
+                        
+                        if (error) {
+                            console.error('부스 운영 시작 기록 실패:', error);
+                        }
+                    } catch (error) {
+                        console.error('부스 운영 시작 기록 중 오류:', error);
+                    }
+                }
+                
                 this.render();
             },
             goBackToSelection() {
@@ -609,6 +630,18 @@
                 } catch (error) {
                     console.error('참가자 데이터 로드 중 오류:', error);
                 }
+            },
+            
+            getRecentParticipants(participants) {
+                if (!participants || participants.length === 0) return 0;
+                
+                const oneHourAgo = new Date();
+                oneHourAgo.setHours(oneHourAgo.getHours() - 1);
+                
+                return participants.filter(p => {
+                    const participantTime = new Date(p.created_at);
+                    return participantTime >= oneHourAgo;
+                }).length;
             },
             goToStep(step) {
                 this.state.guestbookStep = step;

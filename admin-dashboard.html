@@ -465,12 +465,79 @@
                         </td>
                         <td class="py-3">0</td>
                         <td class="py-3">
-                            <button class="text-indigo-600 hover:text-indigo-800 text-sm">편집</button>
+                            <div class="flex space-x-2">
+                                <button onclick="editBooth(${booth.id})" class="text-indigo-600 hover:text-indigo-800 text-sm px-2 py-1 border border-indigo-300 rounded hover:bg-indigo-50">편집</button>
+                                <button onclick="deleteBooth(${booth.id}, '${booth.name}')" class="text-red-600 hover:text-red-800 text-sm px-2 py-1 border border-red-300 rounded hover:bg-red-50">삭제</button>
+                            </div>
                         </td>
                     </tr>
                 `).join('');
             } catch (error) {
                 console.error('부스 목록 로드 실패:', error);
+            }
+        }
+
+        // 부스 편집 함수 (전역 함수로 등록)
+        window.editBooth = async function(boothId) {
+            try {
+                const { data: booth } = await supabase
+                    .from('booths')
+                    .select('*')
+                    .eq('id', boothId)
+                    .single();
+                
+                if (!booth) {
+                    alert('부스 정보를 찾을 수 없습니다.');
+                    return;
+                }
+                
+                const newName = prompt('부스명을 입력하세요:', booth.name);
+                if (newName === null) return;
+                
+                const newDescription = prompt('부스 설명을 입력하세요:', booth.description || '');
+                if (newDescription === null) return;
+                
+                const { error } = await supabase
+                    .from('booths')
+                    .update({ 
+                        name: newName, 
+                        description: newDescription 
+                    })
+                    .eq('id', boothId);
+                
+                if (error) {
+                    alert('부스 수정에 실패했습니다: ' + error.message);
+                } else {
+                    alert('부스가 성공적으로 수정되었습니다.');
+                    loadBooths();
+                }
+            } catch (error) {
+                console.error('부스 편집 오류:', error);
+                alert('부스 편집 중 오류가 발생했습니다.');
+            }
+        }
+        
+        // 부스 삭제 함수 (전역 함수로 등록)
+        window.deleteBooth = async function(boothId, boothName) {
+            if (!confirm(`"${boothName}" 부스를 정말 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.`)) {
+                return;
+            }
+            
+            try {
+                const { error } = await supabase
+                    .from('booths')
+                    .delete()
+                    .eq('id', boothId);
+                
+                if (error) {
+                    alert('부스 삭제에 실패했습니다: ' + error.message);
+                } else {
+                    alert('부스가 성공적으로 삭제되었습니다.');
+                    loadBooths();
+                }
+            } catch (error) {
+                console.error('부스 삭제 오류:', error);
+                alert('부스 삭제 중 오류가 발생했습니다.');
             }
         }
 
@@ -531,6 +598,7 @@
         // 운영자 현황 로드
         async function loadOperators() {
             try {
+                // 테스트 데이터 제외하고 실제 운영 데이터만 조회
                 const { data: operations } = await supabase
                     .from('booth_operations')
                     .select(`
@@ -538,12 +606,13 @@
                         booths (name)
                     `)
                     .eq('is_active', true)
+                    .not('operator_name', 'like', '운영자%')  // 테스트 데이터 제외
                     .order('started_at', { ascending: false });
                 
                 const operatorsDiv = document.getElementById('operatorsList');
                 
                 if (!operations || operations.length === 0) {
-                    operatorsDiv.innerHTML = '<div class="text-center py-4 text-gray-500">현재 운영 중인 부스가 없습니다.</div>';
+                    operatorsDiv.innerHTML = '<div class="text-center py-4 text-gray-500">현재 운영 중인 부스가 없습니다.<br><small class="text-sm text-gray-400">부스 운영자가 로그인하여 운영을 시작하면 여기에 표시됩니다.</small></div>';
                     return;
                 }
                 
@@ -586,15 +655,16 @@
                 
                 // 성별 통계
                 const genderData = {
-                    남: participants.filter(p => p.gender === '남').length,
-                    여: participants.filter(p => p.gender === '여').length
+                    남성: participants.filter(p => p.gender === '남성').length,
+                    여성: participants.filter(p => p.gender === '여성').length
                 };
                 
                 // 학년 통계
                 const gradeData = {
-                    초등학생: participants.filter(p => p.grade === '초등학생').length,
-                    중학생: participants.filter(p => p.grade === '중학생').length,
-                    고등학생: participants.filter(p => p.grade === '고등학생').length
+                    초등: participants.filter(p => p.school_level === '초등').length,
+                    중등: participants.filter(p => p.school_level === '중등').length,
+                    고등: participants.filter(p => p.school_level === '고등').length,
+                    기타: participants.filter(p => p.school_level === '기타').length
                 };
                 
                 // 차트 그리기
@@ -608,7 +678,13 @@
         // 성별 차트 그리기
         function drawGenderChart(data) {
             const ctx = document.getElementById('genderChart').getContext('2d');
-            new Chart(ctx, {
+            
+            // 기존 차트가 있다면 제거
+            if (window.genderChart && typeof window.genderChart.destroy === 'function') {
+                window.genderChart.destroy();
+            }
+            
+            window.genderChart = new Chart(ctx, {
                 type: 'doughnut',
                 data: {
                     labels: Object.keys(data),
@@ -627,7 +703,13 @@
         // 학년 차트 그리기
         function drawGradeChart(data) {
             const ctx = document.getElementById('gradeChart').getContext('2d');
-            new Chart(ctx, {
+            
+            // 기존 차트가 있다면 제거
+            if (window.gradeChart && typeof window.gradeChart.destroy === 'function') {
+                window.gradeChart.destroy();
+            }
+            
+            window.gradeChart = new Chart(ctx, {
                 type: 'bar',
                 data: {
                     labels: Object.keys(data),
