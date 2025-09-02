@@ -5,7 +5,7 @@
 
 // Supabase 설정
 const SUPABASE_URL = 'https://jxvctchiwgbduzlkvohg.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp4dmN0Y2hpd2diZHV6bGt2b2hnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzU0MDY2MzQsImV4cCI6MjA1MDk4MjYzNH0.5MqGRA7kQbyPHDaVEA5D68R5M8J8zTThQWRi-5Xh2n0';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp4dmN0Y2hpd2diZHV6bGt2b2hnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYzNDcyNTcsImV4cCI6MjA3MTkyMzI1N30.OhO0vURBMgpcbHN8o9_lVvKKfzsaw10jL7kyAIUlVOI';
 
 // Supabase 클라이언트 초기화 (라이브러리 미로딩 대비)
 const supabaseLib = typeof window !== 'undefined' ? window.supabase : undefined;

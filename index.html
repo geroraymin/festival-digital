@@ -94,8 +94,8 @@
         // !! IMPORTANT !!
         // Replace with your own Supabase URL and Anon Key
             // =================================================================
-        const SUPABASE_URL = 'YOUR_SUPABASE_URL'; 
-        const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
+        const SUPABASE_URL = 'https://jxvctchiwgbduzlkvohg.supabase.co'; 
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp4dmN0Y2hpd2diZHV6bGt2b2hnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYzNDcyNTcsImV4cCI6MjA3MTkyMzI1N30.OhO0vURBMgpcbHN8o9_lVvKKfzsaw10jL7kyAIUlVOI';
             // =================================================================
 
         const App = {
@@ -120,7 +120,7 @@
                 this.cacheElements();
                 
                 // Supabase 설정 확인
-                if (SUPABASE_URL === 'YOUR_SUPABASE_URL' || SUPABASE_ANON_KEY === 'YOUR_SUPABASE_ANON_KEY') {
+                if (!SUPABASE_URL || !SUPABASE_ANON_KEY || SUPABASE_URL === 'YOUR_SUPABASE_URL' || SUPABASE_ANON_KEY === 'YOUR_SUPABASE_ANON_KEY') {
                     console.warn('Supabase가 설정되지 않았습니다. 목업 데이터로 동작합니다.');
                     this.initMockMode();
                     return;
@@ -238,7 +238,7 @@
                 if (this.subscriptions.participants) this.supabase.removeChannel(this.subscriptions.participants);
             },
 
-            render() {
+            async render() {
                 const { currentView, user, role } = this.state;
                 this.elements.loginView.classList.toggle('hidden', currentView !== 'login');
                 this.elements.mainAppView.classList.toggle('hidden', currentView === 'login');
@@ -249,7 +249,7 @@
                     if (currentView === 'adminDashboard') {
                         viewHtml = this.renderAdminDashboard();
                     } else if (currentView === 'boothSelection') {
-                        viewHtml = this.renderBoothSelection();
+                        viewHtml = await this.renderBoothSelection();
                     } else if (currentView === 'boothDashboard') {
                         viewHtml = this.renderBoothDashboard();
                     }
@@ -285,10 +285,30 @@
                 </div>`;
             },
 
-                renderBoothSelection() {
+                async renderBoothSelection() {
+                // Supabase에서 부스 목록 로드
+                if (this.supabase) {
+                    try {
+                        const { data: booths, error } = await this.supabase
+                            .from('booths')
+                            .select('*')
+                            .eq('is_active', true)
+                            .order('name');
+                        
+                        if (error) {
+                            console.error('부스 목록 로드 실패:', error);
+                        } else {
+                            this.state.booths = booths || [];
+                        }
+                    } catch (error) {
+                        console.error('부스 목록 로드 중 오류:', error);
+                    }
+                }
+
                 const boothsHtml = this.state.booths.map(booth => `
                     <button onclick="App.selectBooth(${booth.id})" class="w-full text-left p-6 bg-white rounded-xl shadow hover:shadow-lg hover:bg-blue-50 transition">
                         <h3 class="text-lg font-bold text-blue-600">${booth.name}</h3>
+                        <p class="text-sm text-slate-500 mt-1">${booth.description || ''}</p>
                     </button>
                 `).join('');
 
@@ -358,7 +378,7 @@
                     case 3: return `<div id="step-3" class="step-card visible-step"><h3 class="text-xl font-bold text-center">성별을 선택해 주세요.</h3><div class="mt-6 grid grid-cols-2 gap-4"><button onclick="App.selectOption('gender', '남성')" class="p-4 border rounded-lg text-lg transition ${gender === '남성' ? 'border-blue-500 bg-blue-50' : 'border-slate-300'}">남성</button><button onclick="App.selectOption('gender', '여성')" class="p-4 border rounded-lg text-lg transition ${gender === '여성' ? 'border-blue-500 bg-blue-50' : 'border-slate-300'}">여성</button></div><div class="mt-6 flex space-x-4"><button onclick="App.goToStep(2)" class="w-full py-3 rounded-lg font-semibold transition btn-secondary">이전</button></div></div>`;
                     case 4: return `<div id="step-4" class="step-card visible-step"><h3 class="text-xl font-bold text-center">교급을 선택해 주세요.</h3><div class="mt-6 grid grid-cols-2 gap-4">${['초등', '중등', '고등', '기타'].map(l => `<button onclick="App.selectOption('school_level', '${l}')" class="p-4 border rounded-lg text-lg transition ${school_level === l ? 'border-blue-500 bg-blue-50' : 'border-slate-300'}">${l}</button>`).join('')}</div><div class="mt-6 flex space-x-4"><button onclick="App.goToStep(3)" class="w-full py-3 rounded-lg font-semibold transition btn-secondary">이전</button></div></div>`;
                     case 5: return `<div id="step-5" class="step-card visible-step"><h3 class="text-xl font-bold text-center">생년월일을 입력해 주세요.</h3><input type="text" id="form-birthDate" class="mt-6 w-full p-3 border rounded-lg text-center text-lg" placeholder="YYYYMMDD" value="${birth_date}" oninput="App.state.formData.birth_date = this.value"><div class="mt-6 flex space-x-4"><button onclick="App.goToStep(4)" class="w-full py-3 rounded-lg font-semibold transition btn-secondary">이전</button><button onclick="App.addParticipant()" class="w-full py-3 rounded-lg font-semibold transition btn-primary">제출하기</button></div></div>`;
-                    case 6: return `<div id="step-6" class="step-card visible-step text-center py-8"><svg class="w-16 h-16 text-green-500 mx-auto mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg><h3 class="text-2xl font-bold">참여해 주셔서 감사합니다!</h3><p class="mt-2 text-slate-600">방명록 작성이 완료되었습니다.</p><button onclick="App.resetGuestbook()" class="mt-8 py-3 px-6 rounded-lg font-semibold transition btn-primary">새로 작성하기</button></div>`;
+                    case 6: return `<div id="step-6" class="step-card visible-step text-center py-8"><svg class="w-16 h-16 text-green-500 mx-auto mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg><h3 class="text-2xl font-bold">참여해 주셔서 감사합니다!</h3><p class="mt-2 text-slate-600">방명록 작성이 완료되었습니다.</p><div class="mt-8 flex space-x-4"><button onclick="App.switchBoothMode('dashboard')" class="flex-1 py-3 px-6 rounded-lg font-semibold transition btn-secondary">대시보드 보기</button><button onclick="App.resetGuestbook()" class="flex-1 py-3 px-6 rounded-lg font-semibold transition btn-primary">새로 작성하기</button></div></div>`;
                     default: return '';
                 }
             },
@@ -427,24 +447,43 @@
                 const email = this.elements.emailInput.value;
                 const password = this.elements.passwordInput.value;
 
+                if (!email || !password) {
+                    alert('이메일과 비밀번호를 입력해주세요.');
+                    this.showLoading(false);
+                    return;
+                }
+
                 // 목업 모드일 때
                 if (!this.supabase) {
-                    if (email && password) {
-                        alert('목업 모드에서는 회원가입이 불가능합니다. 로그인을 사용해주세요.');
-                    } else {
-                        alert('이메일과 비밀번호를 입력해주세요.');
-                    }
+                    alert('목업 모드에서는 회원가입이 불가능합니다. 로그인을 사용해주세요.');
                     this.showLoading(false);
                     return;
                 }
 
                 // Supabase 모드
-                const { data, error } = await this.supabase.auth.signUp({ email, password });
-                if (error) {
-                    alert(error.message);
+                try {
+                    const { data, error } = await this.supabase.auth.signUp({ 
+                        email, 
+                        password,
+                        options: {
+                            emailRedirectTo: window.location.origin
+                        }
+                    });
+                    
+                    if (error) {
+                        console.error('회원가입 오류:', error);
+                        alert(`회원가입 실패: ${error.message}`);
                     } else {
-                    alert('회원가입이 완료되었습니다. 이메일을 확인하여 인증해주세요.');
+                        alert('회원가입이 완료되었습니다. 이메일을 확인하여 인증해주세요.');
+                        // 이메일 입력 필드 초기화
+                        this.elements.emailInput.value = '';
+                        this.elements.passwordInput.value = '';
+                    }
+                } catch (error) {
+                    console.error('회원가입 중 예외 발생:', error);
+                    alert('회원가입 중 오류가 발생했습니다.');
                 }
+                
                 this.showLoading(false);
             },
             async handleLogout() {
@@ -515,12 +554,20 @@
                 }
 
                 // Supabase 모드
-                const { error } = await this.supabase.from('participants').insert({
+                const { data, error } = await this.supabase.from('participants').insert({
                     booth_id: this.state.selectedBoothId,
                     ...this.state.formData
-                });
-                if (error) alert(error.message);
-                else this.goToStep(6);
+                }).select();
+                
+                if (error) {
+                    alert(error.message);
+                } else {
+                    // 성공 시 로컬 상태도 업데이트
+                    if (data && data.length > 0) {
+                        this.state.participants.push(data[0]);
+                    }
+                    this.goToStep(6);
+                }
                 this.showLoading(false);
             },
             
@@ -534,12 +581,34 @@
                 this.state.currentView = 'boothSelection';
                 this.render();
             },
-            switchBoothMode(mode) {
+            async switchBoothMode(mode) {
                 this.state.boothMode = mode;
                 if (mode === 'guestbook') {
                     this.resetGuestbook();
+                } else if (mode === 'dashboard') {
+                    // 대시보드 모드로 전환 시 최신 데이터 로드
+                    await this.loadParticipants();
                 }
                 this.render();
+            },
+            
+            async loadParticipants() {
+                if (!this.supabase) return;
+                
+                try {
+                    const { data, error } = await this.supabase
+                        .from('participants')
+                        .select('*')
+                        .order('created_at', { ascending: false });
+                    
+                    if (error) {
+                        console.error('참가자 데이터 로드 실패:', error);
+                    } else {
+                        this.state.participants = data || [];
+                    }
+                } catch (error) {
+                    console.error('참가자 데이터 로드 중 오류:', error);
+                }
             },
             goToStep(step) {
                 this.state.guestbookStep = step;
