@@ -262,6 +262,58 @@
                 if (this.state.currentView === 'boothDashboard' && this.state.boothMode === 'dashboard') {
                     this.renderCharts();
                 }
+                
+                // 부스 선택 화면에서 행사 선택 드롭다운 초기화
+                if (this.state.currentView === 'boothSelection') {
+                    this.initEventSelector();
+                }
+            },
+
+            // 행사 선택 드롭다운 초기화
+            initEventSelector() {
+                const eventSelector = document.getElementById('eventSelector');
+                if (!eventSelector) return;
+                
+                // 기존 옵션 제거 (전체 행사 제외)
+                eventSelector.innerHTML = '<option value="">전체 행사</option>';
+                
+                // 행사 옵션 추가
+                if (this.state.events && this.state.events.length > 0) {
+                    this.state.events.forEach(event => {
+                        const option = document.createElement('option');
+                        option.value = event.id;
+                        option.textContent = event.name;
+                        eventSelector.appendChild(option);
+                    });
+                }
+                
+                // 행사 선택 변경 이벤트
+                eventSelector.addEventListener('change', () => {
+                    this.filterBoothsByEvent(eventSelector.value);
+                    });
+                },
+
+            // 행사별 부스 필터링
+            filterBoothsByEvent(eventId) {
+                const boothContainer = document.querySelector('#booth-selection-view .grid');
+                if (!boothContainer) return;
+                
+                let filteredBooths = this.state.booths;
+                if (eventId) {
+                    filteredBooths = this.state.booths.filter(booth => booth.event_id === eventId);
+                }
+                
+                const boothsHtml = filteredBooths.map(booth => `
+                    <button onclick="App.selectBooth(${booth.id})" class="w-full text-left p-6 bg-white rounded-xl shadow hover:shadow-lg hover:bg-blue-50 transition">
+                        <div class="flex justify-between items-start mb-2">
+                            <h3 class="text-lg font-bold text-blue-600">${booth.name}</h3>
+                            <span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">${booth.events.name}</span>
+                        </div>
+                        <p class="text-sm text-slate-500 mt-1">${booth.description || ''}</p>
+                    </button>
+                `).join('');
+                
+                boothContainer.innerHTML = boothsHtml || '<p class="text-slate-500 text-center col-span-full">선택한 행사의 부스가 없습니다.</p>';
             },
 
             // Admin View
@@ -286,12 +338,23 @@
             },
 
                 async renderBoothSelection() {
-                // Supabase에서 부스 목록 로드
+                // Supabase에서 부스 목록 로드 (행사별 필터링)
                 if (this.supabase) {
                     try {
+                        // 행사 목록 로드
+                        const { data: events } = await this.supabase
+                            .from('events')
+                            .select('id, name')
+                            .eq('status', 'active')
+                            .order('name');
+                        
+                        // 부스 목록 로드 (행사 정보 포함)
                         const { data: booths, error } = await this.supabase
                             .from('booths')
-                            .select('*')
+                            .select(`
+                                *,
+                                events!inner(id, name)
+                            `)
                             .eq('is_active', true)
                             .order('name');
                         
@@ -299,6 +362,7 @@
                             console.error('부스 목록 로드 실패:', error);
                         } else {
                             this.state.booths = booths || [];
+                            this.state.events = events || [];
                         }
                     } catch (error) {
                         console.error('부스 목록 로드 중 오류:', error);
@@ -307,7 +371,10 @@
 
                 const boothsHtml = this.state.booths.map(booth => `
                     <button onclick="App.selectBooth(${booth.id})" class="w-full text-left p-6 bg-white rounded-xl shadow hover:shadow-lg hover:bg-blue-50 transition">
-                        <h3 class="text-lg font-bold text-blue-600">${booth.name}</h3>
+                        <div class="flex justify-between items-start mb-2">
+                            <h3 class="text-lg font-bold text-blue-600">${booth.name}</h3>
+                            <span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">${booth.events.name}</span>
+                        </div>
                         <p class="text-sm text-slate-500 mt-1">${booth.description || ''}</p>
                     </button>
                 `).join('');
@@ -318,6 +385,19 @@
                             <h2 class="text-2xl font-bold text-slate-900">부스 선택</h2>
                             <p class="mt-1 text-slate-600">운영할 부스를 선택해 주세요.</p>
                         </div>
+                        
+                        <!-- 행사 선택 헤더 -->
+                        <div class="max-w-2xl mx-auto mb-6">
+                            <div class="bg-white p-4 rounded-lg shadow">
+                                <div class="flex items-center justify-between">
+                                    <label class="text-sm font-medium text-gray-700">행사 선택:</label>
+                                    <select id="eventSelector" class="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                        <option value="">전체 행사</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        
                         <div class="max-w-2xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-4">
                             ${boothsHtml || '<p class="text-slate-500 text-center col-span-full">운영 가능한 부스가 없습니다. 먼저 부스를 생성해주세요.</p>'}
                         </div>
@@ -553,15 +633,17 @@
                     return;
                 }
 
-                // Supabase 모드
+                // Supabase 모드 - 현재 부스의 행사 ID 포함
+                const selectedBooth = this.state.booths.find(b => b.id === this.state.selectedBoothId);
                 const { data, error } = await this.supabase.from('participants').insert({
                     booth_id: this.state.selectedBoothId,
+                    event_id: selectedBooth?.event_id,
                     ...this.state.formData
                 }).select();
                 
                 if (error) {
                     alert(error.message);
-                } else {
+                    } else {
                     // 성공 시 로컬 상태도 업데이트
                     if (data && data.length > 0) {
                         this.state.participants.push(data[0]);
@@ -578,10 +660,14 @@
                 // 부스 운영 시작 기록
                 if (this.supabase) {
                     try {
+                        // 선택된 부스의 행사 ID 가져오기
+                        const selectedBooth = this.state.booths.find(b => b.id === id);
+                        
                         const { error } = await this.supabase
                             .from('booth_operations')
                             .insert({
                                 booth_id: id,
+                                event_id: selectedBooth?.event_id,
                                 operation_type: 'start',
                                 operator_name: this.state.user?.email || 'Unknown',
                                 is_active: true
@@ -614,12 +700,17 @@
             },
             
             async loadParticipants() {
-                if (!this.supabase) return;
+                if (!this.supabase || !this.state.selectedBooth) return;
                 
                 try {
+                    // 현재 선택된 부스의 행사 ID 가져오기
+                    const selectedBooth = this.state.booths.find(b => b.id === this.state.selectedBooth.id);
+                    if (!selectedBooth) return;
+                    
                     const { data, error } = await this.supabase
                         .from('participants')
                         .select('*')
+                        .eq('event_id', selectedBooth.event_id)
                         .order('created_at', { ascending: false });
                     
                     if (error) {
