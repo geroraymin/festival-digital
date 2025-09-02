@@ -643,7 +643,7 @@
                     case 1: return `<div id="step-1" class="step-card visible-step"><h3 class="text-xl font-bold text-center">개인정보 수집 및 이용 동의</h3><div class="mt-6 p-4 bg-slate-50 border rounded-lg text-sm text-slate-600 space-y-3"><p><strong>(주)OOO</strong>는 축제 참여자 통계 분석을 위해 개인정보를 수집합니다.</p><ul class="list-disc list-inside space-y-1"><li>수집 항목: 이름, 성별, 교급, 생년월일</li><li>보유 기간: 수집일로부터 90일 후 자동 파기</li></ul></div><div class="mt-6"><p class="text-center font-medium mb-4">위 내용에 동의하십니까?</p><div class="flex space-x-4"><button onclick="App.goToStep(2)" class="w-full py-3 rounded-lg font-semibold transition btn-primary">동의함</button><button onclick="App.switchBoothMode('dashboard')" class="w-full py-3 rounded-lg font-semibold transition btn-secondary">동의하지 않음</button></div></div></div>`;
                     case 2: return `<div id="step-2" class="step-card visible-step"><h3 class="text-xl font-bold text-center">이름을 입력해 주세요.</h3><input type="text" id="form-name" class="mt-6 w-full p-3 border rounded-lg text-center text-lg" placeholder="홍길동" value="${name}" oninput="App.state.formData.name = this.value"><div class="mt-6 flex space-x-4"><button onclick="App.goToStep(1)" class="w-full py-3 rounded-lg font-semibold transition btn-secondary">이전</button><button onclick="App.goToStep(3)" class="w-full py-3 rounded-lg font-semibold transition btn-primary">다음</button></div></div>`;
                     case 3: return `<div id="step-3" class="step-card visible-step"><h3 class="text-xl font-bold text-center">성별을 선택해 주세요.</h3><div class="mt-6 grid grid-cols-2 gap-4"><button onclick="App.selectOption('gender', '남성')" class="p-4 border rounded-lg text-lg transition ${gender === '남성' ? 'border-blue-500 bg-blue-50' : 'border-slate-300'}">남성</button><button onclick="App.selectOption('gender', '여성')" class="p-4 border rounded-lg text-lg transition ${gender === '여성' ? 'border-blue-500 bg-blue-50' : 'border-slate-300'}">여성</button></div><div class="mt-6 flex space-x-4"><button onclick="App.goToStep(2)" class="w-full py-3 rounded-lg font-semibold transition btn-secondary">이전</button></div></div>`;
-                    case 4: return `<div id="step-4" class="step-card visible-step"><h3 class="text-xl font-bold text-center">교급을 선택해 주세요.</h3><div class="mt-6 grid grid-cols-2 gap-4">${['초등', '중등', '고등', '기타'].map(l => `<button onclick="App.selectOption('school_level', '${l}')" class="p-4 border rounded-lg text-lg transition ${school_level === l ? 'border-blue-500 bg-blue-50' : 'border-slate-300'}">${l}</button>`).join('')}</div><div class="mt-6 flex space-x-4"><button onclick="App.goToStep(3)" class="w-full py-3 rounded-lg font-semibold transition btn-secondary">이전</button></div></div>`;
+                    case 4: return `<div id="step-4" class="step-card visible-step"><h3 class="text-xl font-bold text-center">교급을 선택해 주세요.</h3><div class="mt-6 grid grid-cols-2 gap-4">${['유아', '초등', '중등', '고등', '대학', '성인'].map(l => `<button onclick="App.selectOption('school_level', '${l}')" class="p-4 border rounded-lg text-lg transition ${school_level === l ? 'border-blue-500 bg-blue-50' : 'border-slate-300'}">${l}</button>`).join('')}</div><div class="mt-6 flex space-x-4"><button onclick="App.goToStep(3)" class="w-full py-3 rounded-lg font-semibold transition btn-secondary">이전</button></div></div>`;
                     case 5: return `<div id="step-5" class="step-card visible-step"><h3 class="text-xl font-bold text-center">생년월일을 입력해 주세요.</h3><input type="text" id="form-birthDate" class="mt-6 w-full p-3 border rounded-lg text-center text-lg" placeholder="YYYYMMDD" value="${birth_date}" oninput="App.state.formData.birth_date = this.value"><div class="mt-6 flex space-x-4"><button onclick="App.goToStep(4)" class="w-full py-3 rounded-lg font-semibold transition btn-secondary">이전</button><button onclick="App.addParticipant()" class="w-full py-3 rounded-lg font-semibold transition btn-primary">제출하기</button></div></div>`;
                     case 6: return `<div id="step-6" class="step-card visible-step text-center py-8"><svg class="w-16 h-16 text-green-500 mx-auto mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg><h3 class="text-2xl font-bold">참여해 주셔서 감사합니다!</h3><p class="mt-2 text-slate-600">방명록 작성이 완료되었습니다.</p><div class="mt-8 flex space-x-4"><button onclick="App.switchBoothMode('dashboard')" class="flex-1 py-3 px-6 rounded-lg font-semibold transition btn-secondary">대시보드 보기</button><button onclick="App.resetGuestbook()" class="flex-1 py-3 px-6 rounded-lg font-semibold transition btn-primary">새로 작성하기</button></div></div>`;
                     default: return '';
@@ -663,8 +663,11 @@
                     return acc;
                 }, {});
 
+                const schoolLevelLabels = ['유아', '초등', '중등', '고등', '대학', '성인'];
+                const schoolLevelCounts = schoolLevelLabels.map(l => schoolLevelData[l] || 0);
+
                 this.createChart('gender-chart-booth', 'pie', { labels: Object.keys(genderData), datasets: [{ data: Object.values(genderData), backgroundColor: ['#3b82f6', '#ec4899', '#6b7280'] }] });
-                this.createChart('school-level-chart-booth', 'bar', { labels: Object.keys(schoolLevelData), datasets: [{ label: '교급별 참여자', data: Object.values(schoolLevelData), backgroundColor: ['#10b981', '#f97316', '#8b5cf6', '#6b7280'] }] });
+                this.createChart('school-level-chart-booth', 'bar', { labels: schoolLevelLabels, datasets: [{ label: '교급별 참여자', data: schoolLevelCounts, backgroundColor: ['#60a5fa', '#34d399', '#fbbf24', '#f87171', '#a78bfa', '#94a3b8'] }] });
             },
 
             createChart(canvasId, type, data) {
@@ -765,6 +768,20 @@
                     return;
                 }
 
+                // 현재 운영 중 세션 종료 처리 (booth_operations)
+                try {
+                    const email = this.state.user?.email;
+                    if (email) {
+                        await this.supabase
+                            .from('booth_operations')
+                            .update({ is_active: false, operation_type: 'end' })
+                            .eq('operator_name', email)
+                            .eq('is_active', true);
+                    }
+                } catch (e) {
+                    console.warn('운영 종료 처리 중 오류:', e);
+                }
+
                 // Supabase 모드
                 await this.supabase.auth.signOut();
                 this.showLoading(false);
@@ -859,6 +876,15 @@
                     try {
                         // 선택된 부스의 행사 ID 가져오기
                         const selectedBooth = this.state.booths.find(b => b.id === id);
+
+                        // 동일 운영자의 기존 활성 세션 종료
+                        if (this.state.user?.email) {
+                            await this.supabase
+                                .from('booth_operations')
+                                .update({ is_active: false, operation_type: 'end' })
+                                .eq('operator_name', this.state.user.email)
+                                .eq('is_active', true);
+                        }
                         
                         const { error } = await this.supabase
                             .from('booth_operations')
@@ -890,6 +916,19 @@
                 this.state.selectedBoothId = null;
                 this.state.currentView = 'boothSelection';
                 this.render();
+            },
+            // 부스 대시보드에서 나갈 때 운영 종료 처리용 헬퍼
+            async endActiveOperationIfAny() {
+                if (!this.supabase || !this.state.user?.email) return;
+                try {
+                    await this.supabase
+                        .from('booth_operations')
+                        .update({ is_active: false, operation_type: 'end' })
+                        .eq('operator_name', this.state.user.email)
+                        .eq('is_active', true);
+                } catch (e) {
+                    console.warn('운영 종료 처리 실패:', e);
+                }
             },
             async switchBoothMode(mode) {
                 this.state.boothMode = mode;

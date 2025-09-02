@@ -77,7 +77,11 @@
                 </div>
             </div>
             
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="text-2xl font-bold text-indigo-600" id="totalEvents">0</div>
+                    <div class="text-sm text-gray-600">총 행사</div>
+                </div>
                 <div class="bg-white rounded-lg shadow p-6">
                     <div class="text-2xl font-bold text-gray-800" id="totalBooths">0</div>
                     <div class="text-sm text-gray-600">전체 부스</div>
@@ -236,7 +240,7 @@
 
                 <!-- 학년 통계 -->
                 <div class="bg-white rounded-lg shadow p-6">
-                    <h3 class="text-lg font-bold mb-4">학년별 분포</h3>
+                    <h3 class="text-lg font-bold mb-4">교급별 분포</h3>
                     <canvas id="gradeChart"></canvas>
                 </div>
 
@@ -489,6 +493,12 @@
                 const eventFilterElement = document.getElementById('eventFilter');
                 const selectedEventId = eventFilterElement ? eventFilterElement.value : '';
                 console.log('전체 현황 로드 - 선택된 행사 ID:', selectedEventId);
+
+                // 총 행사 수
+                const { data: eventsAll } = await supabase
+                    .from('events')
+                    .select('id');
+                document.getElementById('totalEvents').textContent = eventsAll?.length || 0;
                 
                 // 부스 수 조회 (행사별 필터링)
                 let boothQuery = supabase.from('booths').select('*');
@@ -696,40 +706,94 @@
         // 부스 목록 로드
         async function loadBooths() {
             try {
+                // 부스 + 행사명 로드
                 const { data: booths } = await supabase
                     .from('booths')
                     .select(`
                         *,
-                        events!inner(name)
+                        events ( id, name )
                     `)
                     .order('name');
-                
+
+                // 운영중 부스 로드 (is_active=true)
+                const { data: activeOps } = await supabase
+                    .from('booth_operations')
+                    .select('booth_id, event_id')
+                    .eq('is_active', true);
+
                 const tbody = document.getElementById('boothsList');
-                
+
                 if (!booths || booths.length === 0) {
                     tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-gray-500">등록된 부스가 없습니다.</td></tr>';
                     return;
                 }
-                
-                tbody.innerHTML = booths.map(booth => `
-                    <tr class="border-b">
-                        <td class="py-3">${booth.events.name}</td>
-                        <td class="py-3">${booth.name}</td>
-                        <td class="py-3">${booth.description || '-'}</td>
-                        <td class="py-3">
-                            <span class="px-2 py-1 text-xs rounded ${booth.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">
-                                ${booth.is_active ? '활성' : '비활성'}
-                            </span>
-                        </td>
-                        <td class="py-3">0</td>
-                        <td class="py-3">
-                            <div class="flex space-x-2">
-                                <button onclick="editBooth(${booth.id})" class="text-indigo-600 hover:text-indigo-800 text-sm px-2 py-1 border border-indigo-300 rounded hover:bg-indigo-50">편집</button>
-                                <button onclick="deleteBooth(${booth.id}, '${booth.name}')" class="text-red-600 hover:text-red-800 text-sm px-2 py-1 border border-red-300 rounded hover:bg-red-50">삭제</button>
-                            </div>
-                        </td>
-                    </tr>
-                `).join('');
+
+                // 이벤트별 그룹화
+                const eventIdToGroup = {};
+                booths.forEach(booth => {
+                    const eventId = booth.event_id || booth.events?.id;
+                    const eventName = booth.events?.name || '행사명 미상';
+                    if (!eventIdToGroup[eventId]) {
+                        eventIdToGroup[eventId] = { eventName, booths: [] };
+                    }
+                    eventIdToGroup[eventId].booths.push(booth);
+                });
+
+                // 이벤트별 운영중 부스 수 계산 (booth_id 기준 중복 제거)
+                const eventIdToActiveCount = {};
+                if (activeOps && activeOps.length > 0) {
+                    const byEvent = activeOps.reduce((acc, op) => {
+                        if (!acc[op.event_id]) acc[op.event_id] = new Set();
+                        if (op.booth_id) acc[op.event_id].add(op.booth_id);
+                        return acc;
+                    }, {});
+                    Object.keys(byEvent).forEach(eid => {
+                        eventIdToActiveCount[eid] = byEvent[eid].size;
+                    });
+                }
+
+                // 렌더링: 행사 헤더 + 해당 부스들
+                const rows = [];
+                Object.entries(eventIdToGroup).forEach(([eventId, group]) => {
+                    const totalCount = group.booths.length;
+                    const activeCount = eventIdToActiveCount[eventId] || 0;
+                    // 행사 구분 헤더 행
+                    rows.push(`
+                        <tr class="bg-gray-50">
+                            <td class="py-2 font-semibold text-gray-800" colspan="6">
+                                <div class="flex items-center justify-between">
+                                    <span>행사: ${group.eventName}</span>
+                                    <span class="text-sm text-gray-600">부스 ${totalCount}개 · 운영 중 ${activeCount}개</span>
+                                </div>
+                            </td>
+                        </tr>
+                    `);
+
+                    // 부스 상세 행들
+                    group.booths.forEach(booth => {
+                        rows.push(`
+                            <tr class="border-b">
+                                <td class="py-3">${group.eventName}</td>
+                                <td class="py-3">${booth.name}</td>
+                                <td class="py-3">${booth.description || '-'}</td>
+                                <td class="py-3">
+                                    <span class="px-2 py-1 text-xs rounded ${booth.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">
+                                        ${booth.is_active ? '활성' : '비활성'}
+                                    </span>
+                                </td>
+                                <td class="py-3">0</td>
+                                <td class="py-3">
+                                    <div class="flex space-x-2">
+                                        <button onclick="editBooth(${booth.id})" class="text-indigo-600 hover:text-indigo-800 text-sm px-2 py-1 border border-indigo-300 rounded hover:bg-indigo-50">편집</button>
+                                        <button onclick="deleteBooth(${booth.id}, '${booth.name}')" class="text-red-600 hover:text-red-800 text-sm px-2 py-1 border border-red-300 rounded hover:bg-red-50">삭제</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        `);
+                    });
+                });
+
+                tbody.innerHTML = rows.join('');
             } catch (error) {
                 console.error('부스 목록 로드 실패:', error);
             }
@@ -1002,11 +1066,15 @@
                 };
                 
                 // 학년 통계
+                const levelLabels = ['유아', '초등', '중등', '고등', '대학', '성인'];
+                const levelCountByLabel = participants.reduce((acc, p) => {
+                    const key = p.school_level;
+                    acc[key] = (acc[key] || 0) + 1;
+                    return acc;
+                }, {});
                 const gradeData = {
-                    초등: participants.filter(p => p.school_level === '초등').length,
-                    중등: participants.filter(p => p.school_level === '중등').length,
-                    고등: participants.filter(p => p.school_level === '고등').length,
-                    기타: participants.filter(p => p.school_level === '기타').length
+                    labels: levelLabels,
+                    counts: levelLabels.map(label => levelCountByLabel[label] || 0)
                 };
                 
                 // 차트 그리기
@@ -1054,11 +1122,11 @@
             window.gradeChart = new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: Object.keys(data),
+                    labels: data.labels,
                     datasets: [{
                         label: '참가자 수',
-                        data: Object.values(data),
-                        backgroundColor: '#8B5CF6'
+                        data: data.counts,
+                        backgroundColor: ['#60a5fa', '#34d399', '#fbbf24', '#f87171', '#a78bfa', '#94a3b8']
                     }]
                 },
                 options: {
