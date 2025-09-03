@@ -75,9 +75,11 @@
                         </button>
                     </div>
                 </div>
+                <!-- 칩 형태의 트렌디 필터 -->
+                <div id="eventChips" class="mt-4 flex flex-wrap gap-2"></div>
             </div>
             
-            <div class="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
+            <div class="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8" id="summaryCards">
                 <div class="bg-white rounded-lg shadow p-6">
                     <div class="text-2xl font-bold text-indigo-600" id="totalEvents">0</div>
                     <div class="text-sm text-gray-600">총 행사</div>
@@ -103,7 +105,15 @@
             <!-- 실시간 운영 현황 -->
             <div class="bg-white rounded-lg shadow p-6">
                 <h2 class="text-lg font-bold mb-4">실시간 운영 현황</h2>
-                <div id="realtimeStatus" class="space-y-2">
+                <!-- 도구바 -->
+                <div class="flex items-center justify-between mb-4">
+                    <div class="text-sm text-gray-500">행사별로 접어서 볼 수 있어요.</div>
+                    <div class="space-x-2">
+                        <button id="expandAllOps" class="px-3 py-1 text-sm rounded border border-gray-300 hover:bg-gray-50">모두 펼치기</button>
+                        <button id="collapseAllOps" class="px-3 py-1 text-sm rounded border border-gray-300 hover:bg-gray-50">모두 접기</button>
+                    </div>
+                </div>
+                <div id="realtimeStatus" class="space-y-4">
                     <div class="text-gray-500">데이터를 불러오는 중...</div>
                 </div>
             </div>
@@ -501,7 +511,7 @@
                 document.getElementById('totalEvents').textContent = eventsAll?.length || 0;
                 
                 // 부스 수 조회 (행사별 필터링)
-                let boothQuery = supabase.from('booths').select('*');
+                let boothQuery = supabase.from('booths').select('*, events(name)');
                 if (selectedEventId) {
                     boothQuery = boothQuery.eq('event_id', selectedEventId);
                     console.log('부스 필터링 적용:', selectedEventId);
@@ -557,26 +567,83 @@
                 return;
             }
             
-            const html = booths.map(booth => {
-                const operation = operations?.find(op => op.booth_id === booth.id);
-                return `
-                    <div class="flex justify-between items-center p-3 border rounded">
-                        <div>
-                            <div class="font-medium">${booth.name}</div>
-                            <div class="text-sm text-gray-600">코드: ${booth.booth_code || '미발급'}</div>
+            // 이벤트별 그룹화
+            const groups = booths.reduce((acc, b) => {
+                const eventName = b.events?.name || '행사명 미상';
+                if (!acc[eventName]) acc[eventName] = [];
+                acc[eventName].push(b);
+                return acc;
+            }, {});
+
+            const pieces = [];
+            let groupIndex = 0;
+            Object.entries(groups).forEach(([eventName, eventBooths]) => {
+                // 헤더
+                pieces.push(`
+                    <div class="flex items-center justify-between py-2">
+                        <div class="inline-flex items-center gap-2">
+                            <span class="inline-flex items-center justify-center w-6 h-6 text-xs font-semibold text-white rounded-full bg-gradient-to-br from-indigo-500 to-blue-600">E</span>
+                            <span class="text-sm font-semibold text-gray-800">${eventName}</span>
+                            <span class="text-xs text-gray-500">부스 ${eventBooths.length}개</span>
                         </div>
-                        <div class="text-right">
-                            ${operation ? 
-                                `<span class="text-green-600">운영 중</span>
-                                 <div class="text-sm text-gray-600">${operation.operator_name}</div>` :
-                                '<span class="text-gray-400">대기 중</span>'
-                            }
-                        </div>
+                        <button class="text-sm text-indigo-600 hover:text-indigo-800" onclick="toggleEventGroup(${groupIndex})" id="eventToggleBtn-${groupIndex}">접기</button>
                     </div>
-                `;
-            }).join('');
-            
-            statusDiv.innerHTML = html;
+                `);
+
+                // 부스 카드들 (그리드)
+                const cards = eventBooths.map(booth => {
+                    const op = operations?.find(op => op.booth_id === booth.id);
+                    const statusChip = op ? '<span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-700">운영 중</span>' : '<span class="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-600">대기 중</span>';
+                    const operatorText = op?.operator_name || '-';
+                    return `
+                        <div class="flex justify-between items-center p-3 border rounded-lg bg-white hover:bg-gray-50">
+                            <div>
+                                <div class="font-medium text-gray-900">${booth.name}</div>
+                                <div class="text-sm text-gray-500">코드: ${booth.booth_code || '미발급'}</div>
+                            </div>
+                            <div class="text-right space-y-1">
+                                ${statusChip}
+                                <div class="text-xs text-gray-500">${operatorText}</div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+
+                pieces.push(`
+                    <div id="eventGroup-${groupIndex}" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                        ${cards}
+                    </div>
+                `);
+
+                groupIndex += 1;
+            });
+
+            statusDiv.innerHTML = pieces.join('');
+
+            // 모두 접기/펼치기 이벤트
+            document.getElementById('expandAllOps')?.addEventListener('click', () => toggleAllEventGroups(true));
+            document.getElementById('collapseAllOps')?.addEventListener('click', () => toggleAllEventGroups(false));
+        }
+
+        // 그룹 토글 함수
+        window.toggleEventGroup = function(idx) {
+            const el = document.getElementById(`eventGroup-${idx}`);
+            const btn = document.getElementById(`eventToggleBtn-${idx}`);
+            if (!el || !btn) return;
+            const hidden = el.classList.toggle('hidden');
+            btn.textContent = hidden ? '펼치기' : '접기';
+        }
+
+        function toggleAllEventGroups(expand) {
+            let idx = 0;
+            while (true) {
+                const el = document.getElementById(`eventGroup-${idx}`);
+                const btn = document.getElementById(`eventToggleBtn-${idx}`);
+                if (!el || !btn) break;
+                el.classList.toggle('hidden', !expand);
+                btn.textContent = expand ? '접기' : '펼치기';
+                idx += 1;
+            }
         }
 
         // 행사 필터 옵션 로드 (전체 현황용)
@@ -614,8 +681,48 @@
                 if (currentValue) {
                     selectElement.value = currentValue;
                 }
+
+                // 칩 UI 렌더링
+                const chips = document.getElementById('eventChips');
+                const palette = [
+                    'from-indigo-500 to-blue-500',
+                    'from-emerald-500 to-green-500',
+                    'from-rose-500 to-pink-500',
+                    'from-amber-500 to-orange-500',
+                    'from-fuchsia-500 to-purple-500',
+                    'from-sky-500 to-cyan-500'
+                ];
+                chips.innerHTML = '';
+                // 전체 행사 칩
+                const allChip = document.createElement('button');
+                allChip.className = `px-3 py-1 rounded-full border text-sm ${!selectElement.value ? 'border-indigo-300 text-indigo-700 bg-indigo-50' : 'border-gray-300 text-gray-600 hover:bg-gray-50'}`;
+                allChip.textContent = '전체 행사';
+                allChip.onclick = async () => { selectElement.value=''; await loadOverview(); await loadStats(); styleSummaryCards(); };
+                chips.appendChild(allChip);
+                // 개별 행사 칩
+                (events||[]).forEach((ev, idx) => {
+                    const chip = document.createElement('button');
+                    const active = selectElement.value === ev.id;
+                    chip.className = active
+                        ? `px-3 py-1 rounded-full text-white text-sm bg-gradient-to-r ${palette[idx % palette.length]} shadow`
+                        : 'px-3 py-1 rounded-full border border-gray-300 text-sm text-gray-700 hover:bg-gray-50';
+                    chip.innerHTML = active ? `${ev.name}` : `${ev.name}`;
+                    chip.onclick = async () => { selectElement.value = ev.id; await loadOverview(); await loadStats(); loadEventFilterOptions(); styleSummaryCards(); };
+                    chips.appendChild(chip);
+                });
+                styleSummaryCards();
             } catch (error) {
                 console.error('행사 필터 옵션 로드 실패:', error);
+            }
+        }
+
+        // 선택된 행사에 따라 요약 카드 강조 스타일 적용
+        function styleSummaryCards() {
+            const selected = document.getElementById('eventFilter')?.value;
+            const cards = document.querySelectorAll('#summaryCards > div');
+            cards.forEach(card => card.classList.remove('ring-1','ring-indigo-200'));
+            if (selected) {
+                cards.forEach(card => card.classList.add('ring-1','ring-indigo-200'));
             }
         }
 
@@ -757,23 +864,29 @@
                 Object.entries(eventIdToGroup).forEach(([eventId, group]) => {
                     const totalCount = group.booths.length;
                     const activeCount = eventIdToActiveCount[eventId] || 0;
-                    // 행사 구분 헤더 행
+                    // 행사 구분 헤더 행 (트렌디 스타일)
                     rows.push(`
-                        <tr class="bg-gray-50">
-                            <td class="py-2 font-semibold text-gray-800" colspan="6">
-                                <div class="flex items-center justify-between">
-                                    <span>행사: ${group.eventName}</span>
-                                    <span class="text-sm text-gray-600">부스 ${totalCount}개 · 운영 중 ${activeCount}개</span>
+                        <tr class="">
+                            <td class="py-3" colspan="6">
+                                <div class="flex items-center justify-between px-4 py-3 rounded-lg border bg-white shadow-sm">
+                                    <div class="flex items-center space-x-3">
+                                        <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-blue-600 text-white text-sm font-semibold">E</span>
+                                        <span class="text-base font-semibold text-gray-900">${group.eventName}</span>
+                                    </div>
+                                    <div class="flex items-center gap-2 text-sm">
+                                        <span class="px-2 py-1 rounded-full bg-gray-100 text-gray-700">부스 ${totalCount}개</span>
+                                        <span class="px-2 py-1 rounded-full bg-green-100 text-green-700">운영 중 ${activeCount}개</span>
+                                    </div>
                                 </div>
                             </td>
                         </tr>
                     `);
 
-                    // 부스 상세 행들
+                    // 부스 상세 행들 (행사명 컬럼은 반복 표시하지 않음)
                     group.booths.forEach(booth => {
                         rows.push(`
-                            <tr class="border-b">
-                                <td class="py-3">${group.eventName}</td>
+                            <tr class="border-b hover:bg-gray-50/60">
+                                <td class="py-3 text-gray-400">↳</td>
                                 <td class="py-3">${booth.name}</td>
                                 <td class="py-3">${booth.description || '-'}</td>
                                 <td class="py-3">
@@ -1202,6 +1315,8 @@
                     console.log('행사 필터 변경:', this.value);
                     await loadOverview();
                     await loadStats();
+                    loadEventFilterOptions();
+                    styleSummaryCards();
                 });
             }
 
